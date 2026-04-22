@@ -1,4 +1,5 @@
 from django.test import TestCase
+import docker
 from unittest.mock import patch, MagicMock
 from .models import Project, Deployment
 from .services import (
@@ -132,3 +133,30 @@ class ContainerServiceTest(TestCase):
         self.deployment.refresh_from_db()
         self.assertEqual(self.deployment.status, Deployment.Status.REMOVED)
         self.assertIsNone(self.deployment.container_id)
+
+class TraefikServiceTest(TestCase):
+    @patch('projects.services.get_docker_client')
+    def test_ensure_global_proxy_creates_everything(self, mock_get_client):
+        mock_client = MagicMock()
+        mock_get_client.return_value = mock_client
+
+        # Mock network not found
+        mock_client.networks.get.side_effect = docker.errors.NotFound("Network not found")
+        # Mock container not found
+        mock_client.containers.get.side_effect = docker.errors.NotFound("Container not found")
+
+        from projects.services import ensure_global_proxy, PROXY_NETWORK_NAME, TRAEFIK_CONTAINER_NAME, TRAEFIK_IMAGE
+        ensure_global_proxy()
+
+        mock_client.networks.create.assert_called_once_with(
+            PROXY_NETWORK_NAME,
+            driver="bridge",
+            labels={"khamal.managed": "true"}
+        )
+
+        mock_client.containers.run.assert_called_once()
+        args, kwargs = mock_client.containers.run.call_args
+        self.assertEqual(args[0], TRAEFIK_IMAGE)
+        self.assertEqual(kwargs['name'], TRAEFIK_CONTAINER_NAME)
+        self.assertTrue(kwargs['detach'])
+        self.assertIn("--providers.docker=true", kwargs['command'])
