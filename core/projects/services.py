@@ -1,8 +1,63 @@
 from .docker_client import get_docker_client
 from .models import Project, Deployment
 import logging
+import docker
 
 logger = logging.getLogger(__name__)
+
+PROXY_NETWORK_NAME = "khamal-proxy"
+TRAEFIK_CONTAINER_NAME = "khamal-traefik"
+TRAEFIK_IMAGE = "traefik:v3.1"
+
+def ensure_global_proxy():
+    """
+    Ensures the global Traefik proxy and its network exist.
+    """
+    client = get_docker_client()
+
+    # Ensure proxy network exists
+    try:
+        client.networks.get(PROXY_NETWORK_NAME)
+    except docker.errors.NotFound:
+        logger.info(f"Creating global proxy network: {PROXY_NETWORK_NAME}")
+        client.networks.create(
+            PROXY_NETWORK_NAME,
+            driver="bridge",
+            labels={"khamal.managed": "true"}
+        )
+
+    # Ensure Traefik container exists and is running
+    try:
+        container = client.containers.get(TRAEFIK_CONTAINER_NAME)
+        if container.status != "running":
+            logger.info(f"Starting existing Traefik container: {TRAEFIK_CONTAINER_NAME}")
+            container.start()
+    except docker.errors.NotFound:
+        logger.info(f"Creating and starting Traefik container: {TRAEFIK_CONTAINER_NAME}")
+        client.containers.run(
+            TRAEFIK_IMAGE,
+            name=TRAEFIK_CONTAINER_NAME,
+            detach=True,
+            restart_policy={"Name": "always"},
+            network=PROXY_NETWORK_NAME,
+            ports={
+                '80/tcp': 80,
+                '443/tcp': 443,
+                '8080/tcp': 8080
+            },
+            volumes={
+                '/var/run/docker.sock': {'bind': '/var/run/docker.sock', 'mode': 'ro'}
+            },
+            command=[
+                "--api.insecure=true",
+                "--providers.docker=true",
+                "--providers.docker.exposedbydefault=false",
+                f"--providers.docker.network={PROXY_NETWORK_NAME}",
+                "--entrypoints.web.address=:80",
+                "--entrypoints.websecure.address=:443",
+            ],
+            labels={"khamal.managed": "true"}
+        )
 
 def ensure_project_network(project: Project) -> str:
     """
