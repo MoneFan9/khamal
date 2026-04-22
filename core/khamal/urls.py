@@ -23,6 +23,7 @@ from django.urls import path, include
 
 urlpatterns = [
     path("api/projects/", include("projects.urls")),
+    path("api/servers/", include("pro.servers.urls")),
     path("admin/", admin.site.urls),
     path("", home, name="home"),
 ]
