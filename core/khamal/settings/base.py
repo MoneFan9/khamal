@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     "projects",
     "rest_framework",
     "pro.white_label",
+    "pro.servers",
 ]
 
 MIDDLEWARE = [
