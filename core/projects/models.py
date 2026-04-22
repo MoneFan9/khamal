@@ -25,9 +25,13 @@ class Deployment(models.Model):
     """
     class Status(models.TextChoices):
         PENDING = "PENDING", "Pending"
+        STARTING = "STARTING", "Starting"
         RUNNING = "RUNNING", "Running"
-        SUCCESS = "SUCCESS", "Success"
+        STOPPING = "STOPPING", "Stopping"
+        STOPPED = "STOPPED", "Stopped"
+        RESTARTING = "RESTARTING", "Restarting"
         FAILED = "FAILED", "Failed"
+        REMOVED = "REMOVED", "Removed"
 
     project = models.ForeignKey(
         Project,
@@ -39,6 +43,7 @@ class Deployment(models.Model):
         choices=Status.choices,
         default=Status.PENDING
     )
+    container_id = models.CharField(max_length=255, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

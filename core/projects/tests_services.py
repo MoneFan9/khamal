@@ -1,7 +1,14 @@
 from django.test import TestCase
 from unittest.mock import patch, MagicMock
-from .models import Project
-from .services import ensure_project_network, delete_project_network
+from .models import Project, Deployment
+from .services import (
+    ensure_project_network,
+    delete_project_network,
+    start_container,
+    stop_container,
+    restart_container,
+    remove_container
+)
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
@@ -62,3 +69,66 @@ class NetworkServiceTest(TestCase):
         mock_network.remove.assert_called_once()
         self.project.refresh_from_db()
         self.assertIsNone(self.project.network_id)
+
+class ContainerServiceTest(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="testuser_container", password="password")
+        self.project = Project.objects.create(name="TestProjectContainer", owner=self.user)
+        self.deployment = Deployment.objects.create(
+            project=self.project,
+            container_id="cont_123",
+            status=Deployment.Status.PENDING
+        )
+
+    @patch('projects.services.get_docker_client')
+    def test_start_container(self, mock_get_client):
+        mock_client = MagicMock()
+        mock_get_client.return_value = mock_client
+        mock_container = MagicMock()
+        mock_client.containers.get.return_value = mock_container
+
+        start_container(self.deployment)
+
+        mock_container.start.assert_called_once()
+        self.deployment.refresh_from_db()
+        self.assertEqual(self.deployment.status, Deployment.Status.RUNNING)
+
+    @patch('projects.services.get_docker_client')
+    def test_stop_container(self, mock_get_client):
+        mock_client = MagicMock()
+        mock_get_client.return_value = mock_client
+        mock_container = MagicMock()
+        mock_client.containers.get.return_value = mock_container
+
+        stop_container(self.deployment)
+
+        mock_container.stop.assert_called_once()
+        self.deployment.refresh_from_db()
+        self.assertEqual(self.deployment.status, Deployment.Status.STOPPED)
+
+    @patch('projects.services.get_docker_client')
+    def test_restart_container(self, mock_get_client):
+        mock_client = MagicMock()
+        mock_get_client.return_value = mock_client
+        mock_container = MagicMock()
+        mock_client.containers.get.return_value = mock_container
+
+        restart_container(self.deployment)
+
+        mock_container.restart.assert_called_once()
+        self.deployment.refresh_from_db()
+        self.assertEqual(self.deployment.status, Deployment.Status.RUNNING)
+
+    @patch('projects.services.get_docker_client')
+    def test_remove_container(self, mock_get_client):
+        mock_client = MagicMock()
+        mock_get_client.return_value = mock_client
+        mock_container = MagicMock()
+        mock_client.containers.get.return_value = mock_container
+
+        remove_container(self.deployment)
+
+        mock_container.remove.assert_called_once()
+        self.deployment.refresh_from_db()
+        self.assertEqual(self.deployment.status, Deployment.Status.REMOVED)
+        self.assertIsNone(self.deployment.container_id)

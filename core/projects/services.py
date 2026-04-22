@@ -1,5 +1,5 @@
 from .docker_client import get_docker_client
-from .models import Project
+from .models import Project, Deployment
 import logging
 
 logger = logging.getLogger(__name__)
@@ -62,8 +62,96 @@ def delete_project_network(project: Project):
         project.save(update_fields=['network_id'])
     except Exception as e:
         logger.error(f"Failed to delete network {project.network_id} for project {project.name}: {e}")
-        # We don't necessarily want to block project deletion if network cleanup fails,
-        # but we should log it. Or maybe we should raise?
-        # Usually it's better to try to clean up.
         project.network_id = None
         project.save(update_fields=['network_id'])
+
+def start_container(deployment: Deployment):
+    """
+    Starts the container for the deployment.
+    """
+    if not deployment.container_id:
+        logger.error(f"Cannot start deployment {deployment.id}: no container_id")
+        return
+
+    client = get_docker_client()
+    try:
+        deployment.status = Deployment.Status.STARTING
+        deployment.save(update_fields=['status'])
+
+        container = client.containers.get(deployment.container_id)
+        container.start()
+
+        deployment.status = Deployment.Status.RUNNING
+        deployment.save(update_fields=['status'])
+    except Exception as e:
+        logger.error(f"Failed to start container {deployment.container_id}: {e}")
+        deployment.status = Deployment.Status.FAILED
+        deployment.save(update_fields=['status'])
+        raise
+
+def stop_container(deployment: Deployment):
+    """
+    Stops the container for the deployment.
+    """
+    if not deployment.container_id:
+        return
+
+    client = get_docker_client()
+    try:
+        deployment.status = Deployment.Status.STOPPING
+        deployment.save(update_fields=['status'])
+
+        container = client.containers.get(deployment.container_id)
+        container.stop()
+
+        deployment.status = Deployment.Status.STOPPED
+        deployment.save(update_fields=['status'])
+    except Exception as e:
+        logger.error(f"Failed to stop container {deployment.container_id}: {e}")
+        deployment.status = Deployment.Status.FAILED
+        deployment.save(update_fields=['status'])
+        raise
+
+def restart_container(deployment: Deployment):
+    """
+    Restarts the container for the deployment.
+    """
+    if not deployment.container_id:
+        return
+
+    client = get_docker_client()
+    try:
+        deployment.status = Deployment.Status.RESTARTING
+        deployment.save(update_fields=['status'])
+
+        container = client.containers.get(deployment.container_id)
+        container.restart()
+
+        deployment.status = Deployment.Status.RUNNING
+        deployment.save(update_fields=['status'])
+    except Exception as e:
+        logger.error(f"Failed to restart container {deployment.container_id}: {e}")
+        deployment.status = Deployment.Status.FAILED
+        deployment.save(update_fields=['status'])
+        raise
+
+def remove_container(deployment: Deployment, force=False):
+    """
+    Removes the container for the deployment.
+    """
+    if not deployment.container_id:
+        return
+
+    client = get_docker_client()
+    try:
+        container = client.containers.get(deployment.container_id)
+        container.remove(force=force)
+
+        deployment.container_id = None
+        deployment.status = Deployment.Status.REMOVED
+        deployment.save(update_fields=['container_id', 'status'])
+    except Exception as e:
+        logger.error(f"Failed to remove container {deployment.container_id}: {e}")
+        # Even if removal fails from Docker's side (e.g. not found),
+        # we might want to clear it from our DB if it's a "force" or cleanup operation.
+        raise
