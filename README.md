@@ -4,6 +4,13 @@
 
 Khamal est un orchestrateur intelligent de déploiement (Self-Hosted PaaS) conçu pour transformer n'importe quelle machine physique ou VPS en une infrastructure de production complète. À l'intersection de l'orchestration Docker, de la détection de build automatique et de l'intelligence artificielle locale, Khamal élimine la friction entre le code et la mise en ligne, tout en garantissant une souveraineté totale des données.
 
+## 📂 Structure du Projet
+
+Le projet est divisé en deux parties distinctes :
+
+- **[/core](./core) :** Contient le cœur open-source de Khamal. Sous licence **Apache 2.0**.
+- **[/pro](./pro) :** Contient les extensions et fonctionnalités commerciales. Sous **licence propriétaire**.
+
 ## 🎯 Vision du Projet
 Contrairement aux solutions cloud propriétaires, Khamal rapatrie le pouvoir sur le matériel de l'utilisateur :
 - **Intelligence de Diagnostic (LogSage) :** Utilise des modèles LLM locaux (via Ollama) pour analyser les logs de crash et proposer des correctifs applicables automatiquement.
@@ -27,5 +34,6 @@ Khamal est propulsé par la communauté sous licence Apache 2.0. Des fonctionnal
 *Les scripts d'installation curl automatisés seront bientôt disponibles.*
 
 ## 📄 Licence
-Ce projet est sous licence Apache 2.0 - voir le fichier LICENSE pour plus de détails.
-**Le projet utilise le modèle "Open Core"**
+Ce projet utilise un modèle dual-licensing :
+- Le dossier `/core` est sous licence [Apache 2.0](./core/LICENSE).
+- Le dossier `/pro` est sous [licence commerciale propriétaire](./pro/LICENSE).
