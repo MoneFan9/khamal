@@ -160,3 +160,71 @@ class TraefikServiceTest(TestCase):
         self.assertEqual(kwargs['name'], TRAEFIK_CONTAINER_NAME)
         self.assertTrue(kwargs['detach'])
         self.assertIn("--providers.docker=true", kwargs['command'])
+
+class RoutingLabelsTest(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="testuser_routing", password="password")
+        self.project = Project.objects.create(name="TestProjectRouting", owner=self.user, domain="example.com")
+        self.deployment = Deployment.objects.create(
+            project=self.project,
+            container_port=8080
+        )
+
+    def test_get_routing_labels(self):
+        from projects.services import get_routing_labels
+        labels = get_routing_labels(self.deployment)
+
+        self.assertEqual(labels["traefik.enable"], "true")
+        self.assertEqual(labels[f"traefik.http.routers.khamal-router-{self.deployment.id}.rule"], "Host(`example.com`)")
+        self.assertEqual(labels[f"traefik.http.services.khamal-service-{self.deployment.id}.loadbalancer.server.port"], "8080")
+        self.assertEqual(labels["khamal.project.id"], str(self.project.id))
+
+    def test_get_routing_labels_no_domain(self):
+        self.project.domain = ""
+        self.project.save()
+        from projects.services import get_routing_labels
+        labels = get_routing_labels(self.deployment)
+
+        self.assertEqual(labels, {"khamal.managed": "true"})
+
+class CreateDeploymentContainerTest(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="testuser_create", password="password")
+        self.project = Project.objects.create(name="TestProjectCreate", owner=self.user, domain="test.com")
+        self.deployment = Deployment.objects.create(
+            project=self.project,
+            container_port=3000
+        )
+
+    @patch('projects.services.get_docker_client')
+    @patch('projects.services.ensure_global_proxy')
+    @patch('projects.services.ensure_project_network')
+    def test_create_deployment_container(self, mock_ensure_project_net, mock_ensure_proxy, mock_get_client):
+        mock_ensure_project_net.return_value = "net_project_123"
+        mock_client = MagicMock()
+        mock_get_client.return_value = mock_client
+
+        mock_container = MagicMock()
+        mock_container.id = "new_cont_123"
+        mock_client.containers.run.return_value = mock_container
+
+        mock_proxy_net = MagicMock()
+        mock_client.networks.get.return_value = mock_proxy_net
+
+        from projects.services import create_deployment_container
+        create_deployment_container(self.deployment, "nginx:latest")
+
+        mock_ensure_proxy.assert_called_once()
+        mock_ensure_project_net.assert_called_once_with(self.project)
+
+        mock_client.containers.run.assert_called_once()
+        args, kwargs = mock_client.containers.run.call_args
+        self.assertEqual(args[0], "nginx:latest")
+        self.assertEqual(kwargs['network'], "net_project_123")
+        self.assertEqual(kwargs['labels']['traefik.enable'], "true")
+
+        mock_proxy_net.connect.assert_called_once_with(mock_container)
+
+        self.deployment.refresh_from_db()
+        self.assertEqual(self.deployment.container_id, "new_cont_123")
+        self.assertEqual(self.deployment.status, Deployment.Status.RUNNING)

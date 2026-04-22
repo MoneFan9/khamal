@@ -15,6 +15,7 @@ class Project(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     network_id = models.CharField(max_length=255, blank=True, null=True)
+    domain = models.CharField(max_length=255, blank=True, null=True)
 
     def __str__(self):
         return self.name
@@ -44,6 +45,7 @@ class Deployment(models.Model):
         default=Status.PENDING
     )
     container_id = models.CharField(max_length=255, blank=True, null=True)
+    container_port = models.PositiveIntegerField(default=80)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

@@ -210,3 +210,72 @@ def remove_container(deployment: Deployment, force=False):
         # Even if removal fails from Docker's side (e.g. not found),
         # we might want to clear it from our DB if it's a "force" or cleanup operation.
         raise
+
+def get_routing_labels(deployment: Deployment) -> dict:
+    """
+    Returns the Traefik labels required for routing to this deployment.
+    """
+    project = deployment.project
+    if not project.domain:
+        return {"khamal.managed": "true"}
+
+    # Unique names for Traefik router and service
+    router_name = f"khamal-router-{deployment.id}"
+    service_name = f"khamal-service-{deployment.id}"
+
+    labels = {
+        "traefik.enable": "true",
+        f"traefik.http.routers.{router_name}.rule": f"Host(`{project.domain}`)",
+        f"traefik.http.routers.{router_name}.entrypoints": "web",
+        f"traefik.http.routers.{router_name}.service": service_name,
+        f"traefik.http.services.{service_name}.loadbalancer.server.port": str(deployment.container_port),
+        "khamal.managed": "true",
+        "khamal.project.id": str(project.id),
+        "khamal.deployment.id": str(deployment.id),
+    }
+
+    return labels
+
+def create_deployment_container(deployment: Deployment, image: str):
+    """
+    Creates and starts a container for the deployment with proper networks and labels.
+    """
+    client = get_docker_client()
+    project = deployment.project
+
+    # 1. Ensure networks exist
+    ensure_global_proxy()
+    project_network_id = ensure_project_network(project)
+
+    # 2. Get routing labels
+    labels = get_routing_labels(deployment)
+
+    # 3. Create and run container
+    try:
+        deployment.status = Deployment.Status.STARTING
+        deployment.save(update_fields=['status'])
+
+        # Create container attached to project network first
+        container = client.containers.run(
+            image,
+            detach=True,
+            name=f"khamal-dep-{deployment.id}",
+            labels=labels,
+            network=project_network_id,
+            restart_policy={"Name": "always"}
+        )
+
+        # 4. Connect to global proxy network for routing
+        proxy_net = client.networks.get(PROXY_NETWORK_NAME)
+        proxy_net.connect(container)
+
+        deployment.container_id = container.id
+        deployment.status = Deployment.Status.RUNNING
+        deployment.save(update_fields=['container_id', 'status'])
+
+        return container
+    except Exception as e:
+        logger.error(f"Failed to create/start container for deployment {deployment.id}: {e}")
+        deployment.status = Deployment.Status.FAILED
+        deployment.save(update_fields=['status'])
+        raise
