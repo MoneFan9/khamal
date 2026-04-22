@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "pro.white_label",
     "pro.servers",
+    "pro.ai_support",
 ]
 
 MIDDLEWARE = [
