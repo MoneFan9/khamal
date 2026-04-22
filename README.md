@@ -28,5 +28,4 @@ Khamal est propulsé par la communauté sous licence Apache 2.0. Des fonctionnal
 
 ## 📄 Licence
 Ce projet est sous licence Apache 2.0 - voir le fichier LICENSE pour plus de détails.
-
-## Le projet utilise le modèle "Open Core"
+**Le projet utilise le modèle "Open Core"**
