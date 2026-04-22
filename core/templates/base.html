@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Khamal - {% block title %}Dashboard{% endblock %}</title>
+    {% if white_label_config and white_label_config.custom_css %}
+    <style>
+        {{ white_label_config.custom_css|safe }}
+    </style>
+    {% endif %}
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+    <header>
+        <div class="logo">
+            {% if white_label_config and white_label_config.logo %}
+                <img src="{{ white_label_config.logo.url }}" alt="{{ white_label_config.name }}" style="max-height: 50px;">
+            {% else %}
+                <h1>Khamal</h1>
+            {% endif %}
+        </div>
+    </header>
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+</body>
+</html>
