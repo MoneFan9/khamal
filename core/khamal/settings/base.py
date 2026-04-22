@@ -126,3 +126,7 @@ MEDIA_ROOT = BASE_DIR / "media"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 AUTH_USER_MODEL = 'accounts.User'
+
+# Docker Configuration
+# Using docker-socket-proxy for least privilege access
+DOCKER_URL = env("DOCKER_URL", default="tcp://docker-socket-proxy:2375")
