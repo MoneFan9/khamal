@@ -1,5 +1,6 @@
 from django.db import models
 from django.conf import settings
+from django.utils.text import slugify
 
 class Project(models.Model):
     """
@@ -19,6 +20,12 @@ class Project(models.Model):
 
     def __str__(self):
         return self.name
+
+    def save(self, *args, **kwargs):
+        if not self.domain:
+            suffix = getattr(settings, 'KHAMAL_DEFAULT_DOMAIN_SUFFIX', 'khamal.local')
+            self.domain = f"{slugify(self.name)}.{suffix}"
+        super().save(*args, **kwargs)
 
 class Deployment(models.Model):
     """
