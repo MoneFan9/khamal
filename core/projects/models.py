@@ -53,6 +53,7 @@ class Deployment(models.Model):
     )
     container_id = models.CharField(max_length=255, blank=True, null=True)
     container_port = models.PositiveIntegerField(default=80)
+    hot_reload = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

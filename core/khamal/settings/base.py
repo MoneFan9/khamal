@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     "accounts",
     "projects",
     "git_manager",
+    "local",
     "rest_framework",
     "pro.white_label",
     "pro.servers",
