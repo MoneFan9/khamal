@@ -66,3 +66,23 @@ class ProjectAPITest(APITestCase):
         data = {'name': 'Unauthorized Project'}
         response = self.client.post(self.url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+class ProjectDomainTest(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="domainuser", password="password")
+
+    def test_automatic_domain_generation(self):
+        project = Project.objects.create(
+            name="My Awesome Project",
+            owner=self.user
+        )
+        # Should be slugified name + .khamal.local
+        self.assertEqual(project.domain, "my-awesome-project.khamal.local")
+
+    def test_manual_domain_preserved(self):
+        project = Project.objects.create(
+            name="Custom Domain Project",
+            domain="custom.example.com",
+            owner=self.user
+        )
+        self.assertEqual(project.domain, "custom.example.com")

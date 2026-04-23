@@ -180,8 +180,15 @@ class RoutingLabelsTest(TestCase):
         self.assertEqual(labels["khamal.project.id"], str(self.project.id))
 
     def test_get_routing_labels_no_domain(self):
+        # We need to bypass the auto-generation to test the "no domain" case in the service
+        # or accept that now projects ALWAYS have a domain.
+        # Given the requirements, a project should always have a domain.
+        # So we update the test to reflect that.
         self.project.domain = ""
-        self.project.save()
+        # We use update_fields to bypass the save() logic if we really want to test empty domain
+        Project.objects.filter(id=self.project.id).update(domain="")
+        self.project.refresh_from_db()
+
         from projects.services import get_routing_labels
         labels = get_routing_labels(self.deployment)
 
