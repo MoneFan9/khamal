@@ -38,6 +38,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "accounts",
     "projects",
+    "git_manager",
     "rest_framework",
     "pro.white_label",
     "pro.servers",
