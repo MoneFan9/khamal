@@ -1,0 +1,15 @@
+[phases.setup]
+nixPkgs = ["python3", "nodejs"]
+
+[phases.install]
+cacheDirectories = [
+  "node_modules",
+  "/root/.cache/pip",
+  "/root/.cache/npm"
+]
+
+[phases.build]
+cacheDirectories = [
+  "node_modules",
+  ".next/cache"
+]
