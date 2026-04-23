@@ -1,6 +1,7 @@
 from django.conf import settings
 from .docker_client import get_docker_client
 from .models import Project, Deployment
+from local.models import LocalSource
 import logging
 import docker
 
@@ -283,13 +284,27 @@ def create_deployment_container(deployment: Deployment, image: str):
         deployment.status = Deployment.Status.STARTING
         deployment.save(update_fields=['status'])
 
-        # Create container attached to project network first
+        # 2.5 Prepare volumes for Hot-Reload if enabled
+        volumes = {}
+        if deployment.hot_reload:
+            try:
+                local_source = project.local_source
+                volumes[local_source.host_path] = {
+                    'bind': local_source.container_path,
+                    'mode': 'rw'
+                }
+                logger.info(f"Hot-Reload enabled for deployment {deployment.id}: mounting {local_source.host_path}")
+            except LocalSource.DoesNotExist:
+                logger.warning(f"Hot-Reload enabled for deployment {deployment.id} but no LocalSource found for project {project.id}")
+
+        # 3. Create and run container
         container = client.containers.run(
             image,
             detach=True,
             name=f"khamal-dep-{deployment.id}",
             labels=labels,
             network=project_network_id,
+            volumes=volumes,
             restart_policy={"Name": "always"}
         )
 

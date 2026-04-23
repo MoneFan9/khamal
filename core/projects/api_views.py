@@ -13,3 +13,17 @@ class ProjectListCreateAPIView(generics.ListCreateAPIView):
     def perform_create(self, serializer):
         # Automatically set the owner to the current user
         serializer.save(owner=self.request.user)
+
+from .models import Deployment
+from .serializers import DeploymentSerializer
+
+class DeploymentListCreateAPIView(generics.ListCreateAPIView):
+    """
+    API view to list and create deployments.
+    """
+    queryset = Deployment.objects.all()
+    serializer_class = DeploymentSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return self.queryset.filter(project__owner=self.request.user)
