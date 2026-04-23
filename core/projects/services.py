@@ -1,3 +1,4 @@
+from django.conf import settings
 from .docker_client import get_docker_client
 from .models import Project, Deployment
 import logging
@@ -34,6 +35,32 @@ def ensure_global_proxy():
             container.start()
     except docker.errors.NotFound:
         logger.info(f"Creating and starting Traefik container: {TRAEFIK_CONTAINER_NAME}")
+
+        command = [
+            "--api.insecure=true",
+            "--providers.docker=true",
+            "--providers.docker.exposedbydefault=false",
+            f"--providers.docker.network={PROXY_NETWORK_NAME}",
+            "--entrypoints.web.address=:80",
+            "--entrypoints.websecure.address=:443",
+        ]
+
+        volumes = {
+            '/var/run/docker.sock': {'bind': '/var/run/docker.sock', 'mode': 'ro'}
+        }
+
+        if settings.KHAMAL_SSL_ENABLED:
+            command.extend([
+                "--certificatesresolvers.le.acme.email=" + settings.KHAMAL_ACME_EMAIL,
+                "--certificatesresolvers.le.acme.storage=" + settings.KHAMAL_ACME_STORAGE,
+                "--certificatesresolvers.le.acme.tlschallenge=true",
+                "--certificatesresolvers.le.acme.caserver=" + settings.KHAMAL_ACME_CA_SERVER,
+                "--entrypoints.web.http.redirections.entryPoint.to=websecure",
+                "--entrypoints.web.http.redirections.entryPoint.scheme=https",
+            ])
+            # Persist certificates
+            volumes['khamal-letsencrypt'] = {'bind': '/letsencrypt', 'mode': 'rw'}
+
         client.containers.run(
             TRAEFIK_IMAGE,
             name=TRAEFIK_CONTAINER_NAME,
@@ -45,17 +72,8 @@ def ensure_global_proxy():
                 '443/tcp': 443,
                 '8080/tcp': 8080
             },
-            volumes={
-                '/var/run/docker.sock': {'bind': '/var/run/docker.sock', 'mode': 'ro'}
-            },
-            command=[
-                "--api.insecure=true",
-                "--providers.docker=true",
-                "--providers.docker.exposedbydefault=false",
-                f"--providers.docker.network={PROXY_NETWORK_NAME}",
-                "--entrypoints.web.address=:80",
-                "--entrypoints.websecure.address=:443",
-            ],
+            volumes=volumes,
+            command=command,
             labels={"khamal.managed": "true"}
         )
 
@@ -226,13 +244,23 @@ def get_routing_labels(deployment: Deployment) -> dict:
     labels = {
         "traefik.enable": "true",
         f"traefik.http.routers.{router_name}.rule": f"Host(`{project.domain}`)",
-        f"traefik.http.routers.{router_name}.entrypoints": "web",
         f"traefik.http.routers.{router_name}.service": service_name,
         f"traefik.http.services.{service_name}.loadbalancer.server.port": str(deployment.container_port),
         "khamal.managed": "true",
         "khamal.project.id": str(project.id),
         "khamal.deployment.id": str(deployment.id),
     }
+
+    if settings.KHAMAL_SSL_ENABLED:
+        labels.update({
+            f"traefik.http.routers.{router_name}.entrypoints": "websecure",
+            f"traefik.http.routers.{router_name}.tls": "true",
+            f"traefik.http.routers.{router_name}.tls.certresolver": "le",
+        })
+    else:
+        labels.update({
+            f"traefik.http.routers.{router_name}.entrypoints": "web",
+        })
 
     return labels
 

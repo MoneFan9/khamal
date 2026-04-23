@@ -133,3 +133,9 @@ DOCKER_URL = env("DOCKER_URL", default="tcp://docker-socket-proxy:2375")
 
 # Domain Configuration
 KHAMAL_DEFAULT_DOMAIN_SUFFIX = env("KHAMAL_DEFAULT_DOMAIN_SUFFIX", default="khamal.local")
+
+# SSL / Let's Encrypt Configuration
+KHAMAL_SSL_ENABLED = env.bool("KHAMAL_SSL_ENABLED", default=False)
+KHAMAL_ACME_EMAIL = env("KHAMAL_ACME_EMAIL", default="admin@khamal.local")
+KHAMAL_ACME_STORAGE = env("KHAMAL_ACME_STORAGE", default="/letsencrypt/acme.json")
+KHAMAL_ACME_CA_SERVER = env("KHAMAL_ACME_CA_SERVER", default="https://acme-v02.api.letsencrypt.org/directory")
