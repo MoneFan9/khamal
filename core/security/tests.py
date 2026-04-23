@@ -1,7 +1,9 @@
 from django.test import TestCase
 from unittest.mock import patch, MagicMock
 from security.usb_guard import USBGuardManager
+from security.usb_mount import USBMountManager
 import subprocess
+import os
 
 class USBGuardTests(TestCase):
 
@@ -55,3 +57,51 @@ class USBGuardTests(TestCase):
         result = USBGuardManager.block_device(1)
         self.assertTrue(result)
         mock_run.assert_called_with(["sudo", "usbguard", "block-device", "1"], check=True)
+
+class USBMountTests(TestCase):
+
+    @patch("os.path.exists")
+    @patch("os.makedirs")
+    @patch("subprocess.run")
+    def test_mount_volume_success(self, mock_run, mock_makedirs, mock_exists):
+        mock_exists.return_value = False
+        mock_run.return_value = MagicMock(returncode=0)
+
+        result = USBMountManager.mount_volume("/dev/sdb1", "/mnt/usb")
+
+        self.assertTrue(result)
+        mock_makedirs.assert_called_once_with("/mnt/usb", exist_ok=True)
+        mock_run.assert_called_with(
+            ["sudo", "mount", "-o", "noexec,nosuid,nodev", "/dev/sdb1", "/mnt/usb"],
+            check=True, capture_output=True, text=True
+        )
+
+    @patch("os.path.exists")
+    @patch("subprocess.run")
+    def test_mount_volume_failure(self, mock_run, mock_exists):
+        mock_exists.return_value = True
+        mock_run.side_effect = subprocess.CalledProcessError(1, "mount", stderr="Permission denied")
+
+        result = USBMountManager.mount_volume("/dev/sdb1", "/mnt/usb")
+
+        self.assertFalse(result)
+
+    @patch("subprocess.run")
+    def test_unmount_volume_success(self, mock_run):
+        mock_run.return_value = MagicMock(returncode=0)
+
+        result = USBMountManager.unmount_volume("/mnt/usb")
+
+        self.assertTrue(result)
+        mock_run.assert_called_with(
+            ["sudo", "umount", "/mnt/usb"],
+            check=True, capture_output=True, text=True
+        )
+
+    @patch("subprocess.run")
+    def test_unmount_volume_failure(self, mock_run):
+        mock_run.side_effect = subprocess.CalledProcessError(1, "umount", stderr="Target is busy")
+
+        result = USBMountManager.unmount_volume("/mnt/usb")
+
+        self.assertFalse(result)
