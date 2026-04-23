@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     "projects",
     "git_manager",
     "local",
+    "security",
     "rest_framework",
     "pro.white_label",
     "pro.servers",
