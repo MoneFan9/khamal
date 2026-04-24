@@ -8,7 +8,7 @@ from .services import (
     start_container,
     stop_container,
     restart_container,
-    remove_container
+    remove_container, get_deployment_logs
 )
 from django.contrib.auth import get_user_model
 
@@ -245,3 +245,43 @@ class CreateDeploymentContainerTest(TestCase):
         self.deployment.refresh_from_db()
         self.assertEqual(self.deployment.container_id, "new_cont_123")
         self.assertEqual(self.deployment.status, Deployment.Status.RUNNING)
+
+class LogsServiceTest(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="testuser_logs", password="password")
+        self.project = Project.objects.create(name="TestProjectLogs", owner=self.user)
+        self.deployment = Deployment.objects.create(
+            project=self.project,
+            container_id="cont_logs_123",
+            status=Deployment.Status.RUNNING
+        )
+
+    @patch('projects.services.get_docker_client')
+    def test_get_deployment_logs(self, mock_get_client):
+        mock_client = MagicMock()
+        mock_get_client.return_value = mock_client
+        mock_container = MagicMock()
+        mock_client.containers.get.return_value = mock_container
+
+        # Mock logs to return bytes
+        mock_container.logs.return_value = b"Hello\nWorld"
+
+        logs = get_deployment_logs(self.deployment)
+
+        self.assertEqual(logs, "Hello\nWorld")
+        mock_container.logs.assert_called_once_with(tail=1000, stdout=True, stderr=True)
+
+    @patch('projects.services.get_docker_client')
+    def test_get_deployment_logs_not_found(self, mock_get_client):
+        mock_client = MagicMock()
+        mock_get_client.return_value = mock_client
+        mock_client.containers.get.side_effect = docker.errors.NotFound("Not found")
+
+        logs = get_deployment_logs(self.deployment)
+
+        self.assertEqual(logs, "")
+
+    def test_get_deployment_logs_no_container_id(self):
+        self.deployment.container_id = None
+        logs = get_deployment_logs(self.deployment)
+        self.assertEqual(logs, "")
