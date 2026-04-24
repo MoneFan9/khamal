@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     "git_manager",
     "local",
     "security",
+    "ai",
     "rest_framework",
     "pro.white_label",
     "pro.servers",
@@ -142,3 +143,6 @@ KHAMAL_SSL_ENABLED = env.bool("KHAMAL_SSL_ENABLED", default=False)
 KHAMAL_ACME_EMAIL = env("KHAMAL_ACME_EMAIL", default="admin@khamal.local")
 KHAMAL_ACME_STORAGE = env("KHAMAL_ACME_STORAGE", default="/letsencrypt/acme.json")
 KHAMAL_ACME_CA_SERVER = env("KHAMAL_ACME_CA_SERVER", default="https://acme-v02.api.letsencrypt.org/directory")
+
+# Ollama Configuration
+OLLAMA_URL = env("OLLAMA_URL", default="http://localhost:11434")
