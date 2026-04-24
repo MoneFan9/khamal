@@ -21,6 +21,20 @@ class NixpacksPlan:
     start_cmd: Optional[str] = None
     variables: Dict[str, str] = field(default_factory=dict)
 
+    @property
+    def has_postgres(self) -> bool:
+        """Detects if PostgreSQL is required."""
+        postgres_pkgs = {"postgresql", "libpq", "libpq-dev", "postgresql-client", "pg"}
+        all_pkgs = {p.lower() for p in self.packages + self.libraries + self.apt_packages}
+        return bool(all_pkgs & postgres_pkgs) or any("postgresql" in p for p in all_pkgs)
+
+    @property
+    def has_redis(self) -> bool:
+        """Detects if Redis is required."""
+        redis_pkgs = {"redis", "redis-server", "hiredis"}
+        all_pkgs = {p.lower() for p in self.packages + self.libraries + self.apt_packages}
+        return bool(all_pkgs & redis_pkgs) or any("redis-server" in p for p in all_pkgs)
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "NixpacksPlan":
         """

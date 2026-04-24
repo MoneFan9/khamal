@@ -4,12 +4,19 @@ from .models import Project, Deployment
 from local.models import LocalSource
 import logging
 import docker
+import secrets
+import time
 
 logger = logging.getLogger(__name__)
 
 PROXY_NETWORK_NAME = "khamal-proxy"
 TRAEFIK_CONTAINER_NAME = "khamal-traefik"
 TRAEFIK_IMAGE = "traefik:v3.1"
+
+DATABASE_IMAGES = {
+    "postgres": "postgres:16",
+    "redis": "redis:7-alpine",
+}
 
 def ensure_global_proxy():
     """
@@ -28,17 +35,13 @@ def ensure_global_proxy():
             labels={"khamal.managed": "true"}
         )
 
-    # Ensure Traefik container exists and is running
+    # Ensure Traefik container exists
     try:
-        container = client.containers.get(TRAEFIK_CONTAINER_NAME)
-        if container.status != "running":
-            logger.info(f"Starting existing Traefik container: {TRAEFIK_CONTAINER_NAME}")
-            container.start()
+        client.containers.get(TRAEFIK_CONTAINER_NAME)
     except docker.errors.NotFound:
-        logger.info(f"Creating and starting Traefik container: {TRAEFIK_CONTAINER_NAME}")
+        logger.info(f"Creating global Traefik container: {TRAEFIK_CONTAINER_NAME}")
 
         command = [
-            "--api.insecure=true",
             "--providers.docker=true",
             "--providers.docker.exposedbydefault=false",
             f"--providers.docker.network={PROXY_NETWORK_NAME}",
@@ -298,12 +301,13 @@ def create_deployment_container(deployment: Deployment, image: str):
                 logger.warning(f"Hot-Reload enabled for deployment {deployment.id} but no LocalSource found for project {project.id}")
 
         # 3. Create and run container
+        network_obj = client.networks.get(project_network_id)
         container = client.containers.run(
             image,
             detach=True,
             name=f"khamal-dep-{deployment.id}",
             labels=labels,
-            network=project_network_id,
+            network=network_obj.name,
             volumes=volumes,
             restart_policy={"Name": "always"}
         )
@@ -322,3 +326,102 @@ def create_deployment_container(deployment: Deployment, image: str):
         deployment.status = Deployment.Status.FAILED
         deployment.save(update_fields=['status'])
         raise
+
+def _wait_for_healthy(container, timeout: int = 60):
+    """
+    Waits for a container to become healthy or running.
+    """
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        container.reload()
+        # If the container has a health check, wait for it
+        health = container.attrs.get("State", {}).get("Health", {}).get("Status")
+        if health == "healthy":
+            return True
+        # If no health check, just wait for 'running' status
+        if health is None and container.status == "running":
+            return True
+
+        if container.status == "exited":
+            return False
+
+        time.sleep(2)
+    return False
+
+def provision_database(project: Project, engine: str):
+    """
+    Provisions a database container (PostgreSQL or Redis) for the project.
+    """
+    client = get_docker_client()
+    project_network_id = ensure_project_network(project)
+    network_obj = client.networks.get(project_network_id)
+
+    container_name = f"khamal-db-{engine}-{project.id}"
+    image = DATABASE_IMAGES.get(engine, f"{engine}:latest")
+
+    # Check if container already exists
+    try:
+        container = client.containers.get(container_name)
+        if container.status != "running":
+            container.start()
+        logger.info(f"Database container {container_name} already exists.")
+        return container
+    except docker.errors.NotFound:
+        pass
+
+    logger.info(f"Provisioning {engine} container: {container_name}")
+
+    environment = {}
+    if engine == "postgres":
+        environment = {
+            "POSTGRES_DB": "khamal",
+            "POSTGRES_USER": "khamal",
+            "POSTGRES_PASSWORD": secrets.token_urlsafe(16)
+        }
+
+    volumes = {
+        f"khamal-data-{engine}-{project.id}": {
+            "bind": "/var/lib/postgresql/data" if engine == "postgres" else "/data",
+            "mode": "rw"
+        }
+    }
+
+    try:
+        container = client.containers.run(
+            image,
+            name=container_name,
+            detach=True,
+            network=network_obj.name,
+            environment=environment,
+            volumes=volumes,
+            restart_policy={"Name": "always"},
+            labels={
+                "khamal.managed": "true",
+                "khamal.project.id": str(project.id),
+                "khamal.db.engine": engine
+            }
+        )
+
+        # Wait for database to be ready
+        if not _wait_for_healthy(container):
+            logger.warning(f"Database container {container_name} did not become healthy in time.")
+
+        return container
+    except docker.errors.APIError as e:
+        if e.response is not None and e.response.status_code == 409:
+            logger.info(f"Container {container_name} already exists (race condition).")
+            return client.containers.get(container_name)
+        raise
+    except Exception as e:
+        logger.error(f"Failed to provision {engine} for project {project.id}: {e}")
+        raise
+
+def auto_provision_from_plan(project: Project, plan):
+    """
+    Auto-provisions dependencies based on the Nixpacks plan.
+    """
+    if plan.has_postgres:
+        provision_database(project, "postgres")
+
+    if plan.has_redis:
+        provision_database(project, "redis")

@@ -1,3 +1,4 @@
+from django.test import TestCase
 from unittest import IsolatedAsyncioTestCase
 from unittest.mock import patch, MagicMock, AsyncMock
 import json
@@ -134,3 +135,30 @@ class NixpacksParserTest(IsolatedAsyncioTestCase):
         self.assertEqual(plan.providers, [])
         self.assertEqual(plan.packages, [])
         self.assertEqual(plan.variables, {})
+
+class NixpacksDetectionTest(TestCase):
+    def test_postgres_detection(self):
+        # Exact match
+        plan = NixpacksPlan(packages=["postgresql"])
+        self.assertTrue(plan.has_postgres)
+
+        # Substring match (e.g. postgresql-15)
+        plan = NixpacksPlan(packages=["postgresql-15"])
+        self.assertTrue(plan.has_postgres)
+
+        # Precise match for libpq
+        plan = NixpacksPlan(libraries=["libpq"])
+        self.assertTrue(plan.has_postgres)
+
+        # Case insensitive
+        plan = NixpacksPlan(packages=["PostgreSQL"])
+        self.assertTrue(plan.has_postgres)
+
+    def test_redis_detection(self):
+        # Redis in libraries (previously bugged)
+        plan = NixpacksPlan(libraries=["redis"])
+        self.assertTrue(plan.has_redis)
+
+        # Substring match
+        plan = NixpacksPlan(packages=["redis-server"])
+        self.assertTrue(plan.has_redis)
