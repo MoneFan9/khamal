@@ -31,7 +31,7 @@ class OllamaClient:
             return response.iter_lines()
         return response.json()
 
-    def chat(self, model, messages, options=None, stream=False):
+    def chat(self, model, messages, tools=None, options=None, stream=False):
         """
         Generate the next message in a chat with a provided model.
         """
@@ -40,6 +40,8 @@ class OllamaClient:
             "messages": messages,
             "stream": stream,
         }
+        if tools:
+            payload["tools"] = tools
         if options:
             payload["options"] = options
 

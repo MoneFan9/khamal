@@ -1,6 +1,6 @@
 import logging
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, List, Dict, Any
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +33,12 @@ class RCAPromptBuilder:
         "Be concise, technical, and provide actionable solutions."
     )
 
+    TOOL_ENABLED_SYSTEM_PROMPT = (
+        SYSTEM_PROMPT +
+        " If you identify a clear code or configuration fix, use the 'propose_fix' tool "
+        "to suggest a structured JSON patch."
+    )
+
     RCA_TEMPLATE = """
 ### Context
 - **Project**: {project_name}
@@ -58,11 +64,13 @@ Please analyze them and provide:
         self,
         system_prompt: Optional[str] = None,
         rca_template: Optional[str] = None,
-        max_log_chars: int = 12000
+        max_log_chars: int = 12000,
+        enable_tools: bool = False
     ):
-        self.system_prompt = system_prompt or self.SYSTEM_PROMPT
+        self.system_prompt = system_prompt or (self.TOOL_ENABLED_SYSTEM_PROMPT if enable_tools else self.SYSTEM_PROMPT)
         self._rca_template = rca_template or self.RCA_TEMPLATE
         self.max_log_chars = max_log_chars
+        self.enable_tools = enable_tools
 
     def build_prompt(
         self,
@@ -117,5 +125,6 @@ Please analyze them and provide:
         return (
             f"RCAPromptBuilder("
             f"max_log_chars={self.max_log_chars}, "
-            f"custom_system_prompt={self.system_prompt != self.SYSTEM_PROMPT})"
+            f"enable_tools={self.enable_tools}, "
+            f"custom_system_prompt={self.system_prompt not in (self.SYSTEM_PROMPT, self.TOOL_ENABLED_SYSTEM_PROMPT)})"
         )
