@@ -80,3 +80,15 @@ class OllamaClient:
         response = requests.post(f"{self.api_url}/show", json=payload)
         response.raise_for_status()
         return response.json()
+
+    def unload_model(self, model):
+        """
+        Unload a model from memory by setting keep_alive to 0.
+        """
+        payload = {
+            "model": model,
+            "keep_alive": 0
+        }
+        response = requests.post(f"{self.api_url}/generate", json=payload)
+        response.raise_for_status()
+        return response.json()
