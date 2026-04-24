@@ -1,12 +1,75 @@
 import asyncio
+import json
 import logging
-from typing import List, Optional, Dict
+from dataclasses import dataclass, field
+from typing import List, Optional, Dict, Any
 
 logger = logging.getLogger(__name__)
 
 class NixpacksError(Exception):
     """Custom exception for Nixpacks-related errors."""
     pass
+
+@dataclass
+class NixpacksPlan:
+    providers: List[str] = field(default_factory=list)
+    packages: List[str] = field(default_factory=list)
+    libraries: List[str] = field(default_factory=list)
+    apt_packages: List[str] = field(default_factory=list)
+    install_cmds: List[str] = field(default_factory=list)
+    build_cmds: List[str] = field(default_factory=list)
+    start_cmd: Optional[str] = None
+    variables: Dict[str, str] = field(default_factory=dict)
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "NixpacksPlan":
+        """
+        Creates a NixpacksPlan instance from a dictionary.
+        """
+        phases = data.get("phases", {})
+        setup_phase = phases.get("setup", {})
+        install_phase = phases.get("install", {})
+        build_phase = phases.get("build", {})
+        start_phase = phases.get("start", {})
+
+        def _as_list(value: Any) -> List[str]:
+            if isinstance(value, list):
+                return [str(v) for v in value]
+            if value is None:
+                return []
+            logger.warning("Expected a list but got %s: %r", type(value).__name__, value)
+            return []
+
+        def _as_dict_str(value: Any) -> Dict[str, str]:
+            if isinstance(value, dict):
+                return {str(k): str(v) for k, v in value.items()}
+            if value is None:
+                return {}
+            logger.warning("Expected a dict but got %s: %r", type(value).__name__, value)
+            return {}
+
+        return cls(
+            providers=_as_list(data.get("providers")),
+            packages=_as_list(setup_phase.get("nixPkgs")),
+            libraries=_as_list(setup_phase.get("nixLibs")),
+            apt_packages=_as_list(setup_phase.get("aptPkgs")),
+            install_cmds=_as_list(install_phase.get("cmds")),
+            build_cmds=_as_list(build_phase.get("cmds")),
+            start_cmd=start_phase.get("cmd") or data.get("start", {}).get("cmd"), # Fallback for some nixpacks versions
+            variables=_as_dict_str(data.get("variables"))
+        )
+
+def parse_nixpacks_plan(plan_json: str) -> NixpacksPlan:
+    """
+    Parses the JSON output of 'nixpacks plan' into a NixpacksPlan object.
+    """
+    try:
+        data = json.loads(plan_json)
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to parse Nixpacks plan JSON: {e}")
+        raise NixpacksError(f"Invalid JSON: {e}")
+
+    return NixpacksPlan.from_dict(data)
 
 async def build_image(
     path: str,
