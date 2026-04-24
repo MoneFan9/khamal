@@ -215,8 +215,18 @@ class CreateDeploymentContainerTest(TestCase):
         mock_container.id = "new_cont_123"
         mock_client.containers.run.return_value = mock_container
 
+        mock_net = MagicMock()
+        mock_net.name = "net_project_123_name"
+
         mock_proxy_net = MagicMock()
-        mock_client.networks.get.return_value = mock_proxy_net
+
+        # Mock networks.get to return different networks based on name
+        def side_effect(name):
+            if name == "net_project_123":
+                return mock_net
+            return mock_proxy_net
+
+        mock_client.networks.get.side_effect = side_effect
 
         from projects.services import create_deployment_container
         create_deployment_container(self.deployment, "nginx:latest")
@@ -227,7 +237,7 @@ class CreateDeploymentContainerTest(TestCase):
         mock_client.containers.run.assert_called_once()
         args, kwargs = mock_client.containers.run.call_args
         self.assertEqual(args[0], "nginx:latest")
-        self.assertEqual(kwargs['network'], "net_project_123")
+        self.assertEqual(kwargs['network'], "net_project_123_name")
         self.assertEqual(kwargs['labels']['traefik.enable'], "true")
 
         mock_proxy_net.connect.assert_called_once_with(mock_container)
