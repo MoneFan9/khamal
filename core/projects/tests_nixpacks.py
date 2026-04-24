@@ -1,6 +1,7 @@
 from unittest import IsolatedAsyncioTestCase
 from unittest.mock import patch, MagicMock, AsyncMock
-from .nixpacks import build_image, plan_build, NixpacksError
+import json
+from .nixpacks import build_image, plan_build, NixpacksError, parse_nixpacks_plan, NixpacksPlan
 
 class NixpacksServiceTest(IsolatedAsyncioTestCase):
 
@@ -66,3 +67,70 @@ class NixpacksServiceTest(IsolatedAsyncioTestCase):
             await plan_build("/path/to/source")
 
         self.assertIn("Plan error", str(cm.exception))
+
+class NixpacksParserTest(IsolatedAsyncioTestCase):
+    def test_parse_valid_plan(self):
+        plan_json = json.dumps({
+            "providers": ["python"],
+            "phases": {
+                "setup": {
+                    "nixPkgs": ["python311", "gcc"],
+                    "nixLibs": ["libpq"],
+                    "aptPkgs": ["libssl-dev"]
+                },
+                "install": {
+                    "cmds": ["pip install -r requirements.txt", "pip install ."]
+                },
+                "build": {
+                    "cmds": ["python manage.py collectstatic"]
+                },
+                "start": {
+                    "cmd": "gunicorn khamal.wsgi"
+                }
+            },
+            "variables": {
+                "DJANGO_SETTINGS_MODULE": "khamal.settings.production",
+                "PORT": 8000
+            }
+        })
+
+        plan = parse_nixpacks_plan(plan_json)
+
+        self.assertIsInstance(plan, NixpacksPlan)
+        self.assertEqual(plan.providers, ["python"])
+        self.assertEqual(plan.packages, ["python311", "gcc"])
+        self.assertEqual(plan.libraries, ["libpq"])
+        self.assertEqual(plan.apt_packages, ["libssl-dev"])
+        self.assertEqual(plan.install_cmds, ["pip install -r requirements.txt", "pip install ."])
+        self.assertEqual(plan.build_cmds, ["python manage.py collectstatic"])
+        self.assertEqual(plan.start_cmd, "gunicorn khamal.wsgi")
+        self.assertEqual(plan.variables, {"DJANGO_SETTINGS_MODULE": "khamal.settings.production", "PORT": "8000"})
+
+    def test_parse_minimal_plan(self):
+        plan_json = json.dumps({})
+        plan = parse_nixpacks_plan(plan_json)
+
+        self.assertEqual(plan.providers, [])
+        self.assertEqual(plan.packages, [])
+        self.assertEqual(plan.install_cmds, [])
+        self.assertEqual(plan.start_cmd, None)
+
+    def test_parse_invalid_json(self):
+        with self.assertRaises(NixpacksError):
+            parse_nixpacks_plan("invalid json")
+
+    def test_type_guards(self):
+        # Test that non-list values are handled gracefully
+        plan_json = json.dumps({
+            "providers": "python",
+            "phases": {
+                "setup": {
+                    "nixPkgs": None,
+                }
+            },
+            "variables": "not a dict"
+        })
+        plan = parse_nixpacks_plan(plan_json)
+        self.assertEqual(plan.providers, [])
+        self.assertEqual(plan.packages, [])
+        self.assertEqual(plan.variables, {})
