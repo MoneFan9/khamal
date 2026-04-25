@@ -30,7 +30,8 @@ ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=[])
 # Application definition
 
 INSTALLED_APPS = [
-    "django.contrib.admin",
+    "daphne",
+"django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
@@ -43,6 +44,7 @@ INSTALLED_APPS = [
     "security",
     "ai",
     "rest_framework",
+    "channels",
     "pro.white_label",
     "pro.servers",
     "pro.ai_support",
@@ -77,6 +79,7 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = "khamal.wsgi.application"
+ASGI_APPLICATION = "khamal.asgi.application"
 
 
 # Database
