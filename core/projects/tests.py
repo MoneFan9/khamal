@@ -1,6 +1,8 @@
 from django.test import TestCase
 from django.contrib.auth import get_user_model
 from .models import Project, Deployment
+from .serializers import ProjectSerializer
+from local.models import LocalSource
 
 User = get_user_model()
 
@@ -86,3 +88,52 @@ class ProjectDomainTest(TestCase):
             owner=self.user
         )
         self.assertEqual(project.domain, "custom.example.com")
+
+class ProjectSerializerTest(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="seruser", password="password")
+
+    def test_create_project_with_local_source(self):
+        data = {
+            "name": "Test Project",
+            "local_source": {
+                "host_path": "/host/path",
+                "container_path": "/container/path"
+            }
+        }
+        serializer = ProjectSerializer(data=data)
+        self.assertTrue(serializer.is_valid(), serializer.errors)
+        project = serializer.save(owner=self.user)
+
+        self.assertEqual(project.name, "Test Project")
+        self.assertEqual(project.local_source.host_path, "/host/path")
+
+    def test_update_project_add_local_source(self):
+        project = Project.objects.create(name="Old Name", owner=self.user)
+        data = {
+            "name": "New Name",
+            "local_source": {
+                "host_path": "/new/host",
+                "container_path": "/new/container"
+            }
+        }
+        serializer = ProjectSerializer(instance=project, data=data)
+        self.assertTrue(serializer.is_valid())
+        project = serializer.save()
+
+        self.assertEqual(project.name, "New Name")
+        self.assertEqual(project.local_source.host_path, "/new/host")
+
+    def test_update_project_remove_local_source(self):
+        project = Project.objects.create(name="Project", owner=self.user)
+        LocalSource.objects.create(project=project, host_path="/h", container_path="/c")
+
+        data = {
+            "name": "Project",
+            "local_source": None
+        }
+        serializer = ProjectSerializer(instance=project, data=data)
+        self.assertTrue(serializer.is_valid())
+        project = serializer.save()
+
+        self.assertFalse(LocalSource.objects.filter(project=project).exists())

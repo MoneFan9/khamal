@@ -8,7 +8,10 @@ from .services import (
     start_container,
     stop_container,
     restart_container,
-    remove_container, get_deployment_logs
+    remove_container, get_deployment_logs,
+    provision_database,
+    auto_provision_from_plan,
+    create_deployment_container
 )
 from django.contrib.auth import get_user_model
 
@@ -56,6 +59,36 @@ class NetworkServiceTest(TestCase):
         mock_client.networks.create.assert_not_called()
 
     @patch('projects.services.get_docker_client')
+    def test_ensure_project_network_recreates_if_not_found(self, mock_get_client):
+        self.project.network_id = "non_existent_id"
+        self.project.save()
+
+        mock_client = MagicMock()
+        mock_get_client.return_value = mock_client
+        mock_client.networks.get.side_effect = docker.errors.NotFound("Not found")
+        mock_client.networks.list.return_value = []
+
+        mock_network = MagicMock()
+        mock_network.id = "new_net_id"
+        mock_client.networks.create.return_value = mock_network
+
+        network_id = ensure_project_network(self.project)
+
+        self.assertEqual(network_id, "new_net_id")
+        self.project.refresh_from_db()
+        self.assertEqual(self.project.network_id, "new_net_id")
+
+    @patch('projects.services.get_docker_client')
+    def test_ensure_project_network_creation_failure(self, mock_get_client):
+        mock_client = MagicMock()
+        mock_get_client.return_value = mock_client
+        mock_client.networks.list.return_value = []
+        mock_client.networks.create.side_effect = Exception("Creation failed")
+
+        with self.assertRaises(Exception):
+            ensure_project_network(self.project)
+
+    @patch('projects.services.get_docker_client')
     def test_delete_project_network(self, mock_get_client):
         self.project.network_id = "net_to_delete"
         self.project.save()
@@ -93,6 +126,18 @@ class ContainerServiceTest(TestCase):
         mock_container.start.assert_called_once()
         self.deployment.refresh_from_db()
         self.assertEqual(self.deployment.status, Deployment.Status.RUNNING)
+
+    @patch('projects.services.get_docker_client')
+    def test_start_container_failure(self, mock_get_client):
+        mock_client = MagicMock()
+        mock_get_client.return_value = mock_client
+        mock_client.containers.get.side_effect = Exception("Start failed")
+
+        with self.assertRaises(Exception):
+            start_container(self.deployment)
+
+        self.deployment.refresh_from_db()
+        self.assertEqual(self.deployment.status, Deployment.Status.FAILED)
 
     @patch('projects.services.get_docker_client')
     def test_stop_container(self, mock_get_client):
@@ -206,6 +251,21 @@ class CreateDeploymentContainerTest(TestCase):
     @patch('projects.services.get_docker_client')
     @patch('projects.services.ensure_global_proxy')
     @patch('projects.services.ensure_project_network')
+    def test_create_deployment_container_failure(self, mock_ensure_project_net, mock_ensure_proxy, mock_get_client):
+        mock_ensure_project_net.return_value = "net_project_123"
+        mock_client = MagicMock()
+        mock_get_client.return_value = mock_client
+        mock_client.networks.get.side_effect = Exception("Network lookup failed")
+
+        with self.assertRaises(Exception):
+            create_deployment_container(self.deployment, "nginx:latest")
+
+        self.deployment.refresh_from_db()
+        self.assertEqual(self.deployment.status, Deployment.Status.FAILED)
+
+    @patch('projects.services.get_docker_client')
+    @patch('projects.services.ensure_global_proxy')
+    @patch('projects.services.ensure_project_network')
     def test_create_deployment_container(self, mock_ensure_project_net, mock_ensure_proxy, mock_get_client):
         mock_ensure_project_net.return_value = "net_project_123"
         mock_client = MagicMock()
@@ -285,3 +345,76 @@ class LogsServiceTest(TestCase):
         self.deployment.container_id = None
         logs = get_deployment_logs(self.deployment)
         self.assertEqual(logs, "")
+
+class ProvisioningServiceTest(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="testuser_prov", password="password")
+        self.project = Project.objects.create(name="TestProjectProv", owner=self.user)
+
+    @patch('projects.services.get_docker_client')
+    @patch('projects.services.ensure_project_network')
+    def test_provision_database_postgres(self, mock_ensure_net, mock_get_client):
+        mock_ensure_net.return_value = "net_123"
+        mock_client = MagicMock()
+        mock_get_client.return_value = mock_client
+        mock_client.containers.get.side_effect = docker.errors.NotFound("Not found")
+
+        mock_container = MagicMock()
+        mock_container.attrs = {"State": {"Health": {"Status": "healthy"}}}
+        mock_client.containers.run.return_value = mock_container
+
+        mock_net = MagicMock()
+        mock_net.name = "net_123_name"
+        mock_client.networks.get.return_value = mock_net
+
+        provision_database(self.project, "postgres")
+
+        mock_client.containers.run.assert_called_once()
+        kwargs = mock_client.containers.run.call_args.kwargs
+        self.assertIn("POSTGRES_PASSWORD", kwargs['environment'])
+        self.assertEqual(kwargs['network'], "net_123_name")
+
+    @patch('projects.services.get_docker_client')
+    @patch('projects.services.ensure_project_network')
+    def test_provision_database_already_exists(self, mock_ensure_net, mock_get_client):
+        mock_ensure_net.return_value = "net_123"
+        mock_client = MagicMock()
+        mock_get_client.return_value = mock_client
+
+        mock_container = MagicMock()
+        mock_container.status = "running"
+        mock_client.containers.get.return_value = mock_container
+
+        provision_database(self.project, "postgres")
+
+        mock_client.containers.run.assert_not_called()
+        mock_container.start.assert_not_called()
+
+    @patch('projects.services.get_docker_client')
+    @patch('projects.services.ensure_project_network')
+    def test_provision_database_race_condition(self, mock_ensure_net, mock_get_client):
+        mock_ensure_net.return_value = "net_123"
+        mock_client = MagicMock()
+        mock_get_client.return_value = mock_client
+        mock_client.containers.get.side_effect = docker.errors.NotFound("Not found")
+
+        # Mock APIError 409
+        response = MagicMock()
+        response.status_code = 409
+        mock_client.containers.run.side_effect = docker.errors.APIError("Conflict", response=response)
+
+        mock_container = MagicMock()
+        mock_client.containers.get.side_effect = [docker.errors.NotFound("Not found"), mock_container]
+
+        provision_database(self.project, "postgres")
+        self.assertEqual(mock_client.containers.get.call_count, 2)
+
+    @patch('projects.services.provision_database')
+    def test_auto_provision_from_plan(self, mock_provision):
+        plan = MagicMock()
+        plan.has_postgres = True
+        plan.has_redis = True
+
+        auto_provision_from_plan(self.project, plan)
+
+        self.assertEqual(mock_provision.call_count, 2)
