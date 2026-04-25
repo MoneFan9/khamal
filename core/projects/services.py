@@ -287,7 +287,7 @@ def create_deployment_container(deployment: Deployment, image: str):
         deployment.status = Deployment.Status.STARTING
         deployment.save(update_fields=['status'])
 
-        # 2.5 Prepare volumes for Hot-Reload if enabled
+        # Prepare volumes for Hot-Reload if enabled
         volumes = {}
         if deployment.hot_reload:
             try:
@@ -300,7 +300,6 @@ def create_deployment_container(deployment: Deployment, image: str):
             except LocalSource.DoesNotExist:
                 logger.warning(f"Hot-Reload enabled for deployment {deployment.id} but no LocalSource found for project {project.id}")
 
-        # 3. Create and run container
         network_obj = client.networks.get(project_network_id)
         container = client.containers.run(
             image,
@@ -359,17 +358,14 @@ def provision_database(project: Project, engine: str):
     container_name = f"khamal-db-{engine}-{project.id}"
     image = DATABASE_IMAGES.get(engine, f"{engine}:latest")
 
-    # Check if container already exists
     try:
         container = client.containers.get(container_name)
         if container.status != "running":
             container.start()
-        logger.info(f"Database container {container_name} already exists.")
+        logger.info(f"Database container {container_name} already exists and is running.")
         return container
     except docker.errors.NotFound:
-        pass
-
-    logger.info(f"Provisioning {engine} container: {container_name}")
+        logger.info(f"Provisioning new {engine} container: {container_name}")
 
     environment = {}
     if engine == "postgres":

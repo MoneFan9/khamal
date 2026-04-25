@@ -1,4 +1,3 @@
-import random
 from .models import DiagnosticRequest
 
 class LLMService:
