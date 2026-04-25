@@ -83,6 +83,110 @@ class TestOllamaClient(unittest.TestCase):
             json={"model": "llama3", "keep_alive": 0}
         )
 
+    @patch("requests.post")
+    def test_show_model(self, mock_post):
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"modelfile": "..."}
+        mock_response.status_code = 200
+        mock_post.return_value = mock_response
+
+        result = self.client.show_model(name="llama3")
+
+        self.assertEqual(result["modelfile"], "...")
+        mock_post.assert_called_once_with(
+            "http://ollama-test:11434/api/show",
+            json={"name": "llama3"}
+        )
+
+    @patch("requests.post")
+    def test_generate_stream(self, mock_post):
+        mock_response = MagicMock()
+        mock_response.iter_lines.return_value = [b'{"response": "line1"}']
+        mock_response.status_code = 200
+        mock_post.return_value = mock_response
+
+        result = self.client.generate(model="llama3", prompt="Hi", stream=True)
+        lines = list(result)
+        self.assertEqual(len(lines), 1)
+
+    @patch("requests.post")
+    def test_chat_stream(self, mock_post):
+        mock_response = MagicMock()
+        mock_response.iter_lines.return_value = [b'{"message": {"content": "line1"}}']
+        mock_response.status_code = 200
+        mock_post.return_value = mock_response
+
+        result = self.client.chat(model="llama3", messages=[], stream=True)
+        lines = list(result)
+        self.assertEqual(len(lines), 1)
+
+    @patch("requests.post")
+    def test_chat_full_options(self, mock_post):
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"message": {"content": "ok"}}
+        mock_response.status_code = 200
+        mock_post.return_value = mock_response
+
+        messages = [{"role": "user", "content": "Hello"}]
+        tools = [{"type": "function", "function": {"name": "test"}}]
+        self.client.chat(
+            model="llama3",
+            messages=messages,
+            tools=tools,
+            options={"temperature": 0.5}
+        )
+
+        mock_post.assert_called_once_with(
+            "http://ollama-test:11434/api/chat",
+            json={
+                "model": "llama3",
+                "messages": messages,
+                "stream": False,
+                "tools": tools,
+                "options": {"temperature": 0.5}
+            }
+        )
+
+    @patch("requests.post")
+    def test_pull_model_stream(self, mock_post):
+        mock_response = MagicMock()
+        mock_response.iter_lines.return_value = [b'{"status": "downloading"}']
+        mock_response.status_code = 200
+        mock_post.return_value = mock_response
+
+        result = self.client.pull_model(name="llama3", stream=True)
+        lines = list(result)
+        self.assertEqual(len(lines), 1)
+
+    @patch("requests.post")
+    def test_generate_full_options(self, mock_post):
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"response": "ok"}
+        mock_response.status_code = 200
+        mock_post.return_value = mock_response
+
+        self.client.generate(
+            model="llama3",
+            prompt="Hi",
+            system="system prompt",
+            template="template",
+            context=[1, 2, 3],
+            options={"num_predict": 10}
+        )
+
+        mock_post.assert_called_once_with(
+            "http://ollama-test:11434/api/generate",
+            json={
+                "model": "llama3",
+                "prompt": "Hi",
+                "stream": False,
+                "system": "system prompt",
+                "template": "template",
+                "context": [1, 2, 3],
+                "options": {"num_predict": 10}
+            }
+        )
+
 class TestExecutor(unittest.TestCase):
     def setUp(self):
         self.test_dir = Path(tempfile.mkdtemp())

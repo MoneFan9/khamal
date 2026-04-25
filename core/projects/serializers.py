@@ -9,7 +9,7 @@ class LocalSourceSerializer(serializers.ModelSerializer):
 
 class ProjectSerializer(serializers.ModelSerializer):
     owner_username = serializers.ReadOnlyField(source='owner.username')
-    local_source = LocalSourceSerializer(required=False)
+    local_source = LocalSourceSerializer(required=False, allow_null=True)
 
     class Meta:
         model = Project
