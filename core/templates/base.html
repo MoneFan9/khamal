@@ -8,6 +8,12 @@
         {{ white_label_config.custom_css|safe }}
     </style>
     {% endif %}
+    <style>
+        nav ul { list-style: none; padding: 0; display: flex; gap: 20px; align-items: center; }
+        .pro-badge { background-color: #ffd700; color: #000; padding: 2px 6px; border-radius: 4px; font-size: 0.8em; font-weight: bold; }
+        .btn-pro { background-color: #007bff; color: white; padding: 8px 16px; border-radius: 4px; text-decoration: none; font-weight: bold; }
+        .btn-pro:hover { background-color: #0056b3; }
+    </style>
     {% block extra_head %}{% endblock %}
 </head>
 <body>
@@ -19,6 +25,17 @@
                 <h1>Khamal</h1>
             {% endif %}
         </div>
+        <nav>
+            <ul>
+                <li><a href="/">Dashboard</a></li>
+                {% if is_pro_loaded %}
+                    <li><a href="/admin/pro_white_label/whitelabelconfiguration/">Marque Blanche</a> <span class="pro-badge">PRO</span></li>
+                    <li><a href="/api/servers/">Flotte de Serveurs</a> <span class="pro-badge">PRO</span></li>
+                {% else %}
+                    <li><a href="https://khamal.io/pricing" class="btn-pro">Passer à la version Pro</a></li>
+                {% endif %}
+            </ul>
+        </nav>
     </header>
     <main>
         {% block content %}{% endblock %}

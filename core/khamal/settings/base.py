@@ -73,6 +73,7 @@ TEMPLATES = [
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
                 "pro.white_label.context_processors.white_label",
+                "khamal.context_processors.pro_status",
             ],
         },
     },
