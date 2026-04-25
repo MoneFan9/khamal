@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Logs for Deployment #{{ deployment.id }} ({{ deployment.project.name }})</h2>
+    <div id="log-container" style="background-color: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 5px; height: 500px; overflow-y: scroll; font-family: monospace; white-space: pre-wrap;"></div>
+</div>
+
+<script>
+    const deploymentId = "{{ deployment.id }}";
+    const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+    const logSocket = new WebSocket(
+        protocol + '://' + window.location.host + '/ws/logs/' + deploymentId + '/'
+    );
+
+    const logContainer = document.getElementById('log-container');
+
+    logSocket.onmessage = function(e) {
+        const data = JSON.parse(e.data);
+        if (data.log) {
+            const p = document.createElement('div');
+            p.textContent = data.log;
+            logContainer.appendChild(p);
+            logContainer.scrollTop = logContainer.scrollHeight;
+        } else if (data.error) {
+            const p = document.createElement('div');
+            p.style.color = 'red';
+            p.textContent = 'Error: ' + data.error;
+            logContainer.appendChild(p);
+        }
+    };
+
+    logSocket.onclose = function(e) {
+        console.error('Log socket closed unexpectedly');
+        const p = document.createElement('div');
+        p.style.color = 'orange';
+        p.textContent = 'Connection closed.';
+        logContainer.appendChild(p);
+    };
+</script>
+{% endblock %}
