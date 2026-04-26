@@ -14,7 +14,7 @@ TRAEFIK_CONTAINER_NAME = "khamal-traefik"
 TRAEFIK_IMAGE = "traefik:v3.1"
 
 DATABASE_IMAGES = {
-    "postgres": "postgres:16",
+    "postgres": "postgres:16-alpine",
     "redis": "redis:7-alpine",
 }
 

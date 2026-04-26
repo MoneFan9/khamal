@@ -11,5 +11,7 @@ cacheDirectories = [
 [phases.build]
 cacheDirectories = [
   "node_modules",
-  ".next/cache"
+  ".next/cache",
+  "/root/.cache/pip",
+  "/root/.cache/npm"
 ]

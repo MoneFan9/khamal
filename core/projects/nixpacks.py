@@ -106,7 +106,7 @@ async def build_image(
     Raises:
         NixpacksError: If the build fails.
     """
-    cmd = ["nixpacks", "build", path]
+    cmd = ["nixpacks", "build", path, "--cache"]
 
     if image_name:
         cmd.extend(["--name", image_name])
