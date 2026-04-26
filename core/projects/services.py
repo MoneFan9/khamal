@@ -268,6 +268,23 @@ def get_routing_labels(deployment: Deployment) -> dict:
 
     return labels
 
+def _get_deployment_volumes(deployment: Deployment) -> dict:
+    """
+    Prepares Docker volumes for a deployment, specifically for Hot-Reload.
+    """
+    volumes = {}
+    if deployment.hot_reload:
+        try:
+            local_source = deployment.project.local_source
+            volumes[local_source.host_path] = {
+                'bind': local_source.container_path,
+                'mode': 'rw'
+            }
+            logger.info(f"Hot-Reload enabled for deployment {deployment.id}: mounting {local_source.host_path}")
+        except LocalSource.DoesNotExist:
+            logger.warning(f"Hot-Reload enabled for deployment {deployment.id} but no LocalSource found for project {deployment.project.id}")
+    return volumes
+
 def create_deployment_container(deployment: Deployment, image: str):
     """
     Creates and starts a container for the deployment with proper networks and labels.
@@ -287,18 +304,8 @@ def create_deployment_container(deployment: Deployment, image: str):
         deployment.status = Deployment.Status.STARTING
         deployment.save(update_fields=['status'])
 
-        # Prepare volumes for Hot-Reload if enabled
-        volumes = {}
-        if deployment.hot_reload:
-            try:
-                local_source = project.local_source
-                volumes[local_source.host_path] = {
-                    'bind': local_source.container_path,
-                    'mode': 'rw'
-                }
-                logger.info(f"Hot-Reload enabled for deployment {deployment.id}: mounting {local_source.host_path}")
-            except LocalSource.DoesNotExist:
-                logger.warning(f"Hot-Reload enabled for deployment {deployment.id} but no LocalSource found for project {project.id}")
+        # Prepare volumes
+        volumes = _get_deployment_volumes(deployment)
 
         network_obj = client.networks.get(project_network_id)
         container = client.containers.run(

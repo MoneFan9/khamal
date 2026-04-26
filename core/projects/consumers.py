@@ -25,7 +25,7 @@ class LogConsumer(AsyncWebsocketConsumer):
 
         self.streaming_task = asyncio.create_task(self.stream_logs())
 
-    async def disconnect(self, close_code):
+    async def disconnect(self, _close_code):
         if hasattr(self, 'streaming_task'):
             self.streaming_task.cancel()
 
@@ -39,22 +39,31 @@ class LogConsumer(AsyncWebsocketConsumer):
 
             container = client.containers.get(container_id)
 
-            # Use run_in_executor to not block the event loop with synchronous docker-py
-            loop = asyncio.get_running_loop()
-
-            def tail_logs():
+            def get_log_stream():
                 return container.logs(stream=True, follow=True, tail=100, stdout=True, stderr=True)
 
-            log_stream = await loop.run_in_executor(None, tail_logs)
+            log_stream = await asyncio.to_thread(get_log_stream)
 
-            for line in log_stream:
+            # Define a synchronous wrapper to get the next line from the blocking generator
+            def get_next_line(stream_iter):
+                try:
+                    return next(stream_iter)
+                except StopIteration:
+                    return None
+
+            stream_iter = iter(log_stream)
+            while True:
                 if asyncio.current_task().cancelled():
                     break
+
+                # fetch the next line in a separate thread to avoid blocking the event loop
+                line = await asyncio.to_thread(get_next_line, stream_iter)
+                if line is None:
+                    break
+
                 await self.send(text_data=json.dumps({
                     'log': line.decode('utf-8', errors='replace')
                 }))
-                # Small sleep to yield control
-                await asyncio.sleep(0.01)
 
         except Exception as e:
             await self.send(text_data=json.dumps({'error': str(e)}))
