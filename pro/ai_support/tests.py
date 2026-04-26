@@ -59,3 +59,22 @@ class AISupportTests(TestCase):
         }
         response = self.client.post(url, data, format="json")
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_invalid_data(self):
+        url = "/api/pro/ai-support/diagnose/"
+        data = {
+            "server_id": self.local_server.id,
+            "query": "" # Empty query should fail validation
+        }
+        response = self.client.post(url, data, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_diagnostic_request_str(self):
+        diag = DiagnosticRequest.objects.create(
+            user=self.user,
+            server=self.local_server,
+            query="Test query",
+            routing=DiagnosticRequest.Routing.LOCAL
+        )
+        expected_str = f"Diag for {self.local_server.name} by {self.user.username} (LOCAL)"
+        self.assertEqual(str(diag), expected_str)
