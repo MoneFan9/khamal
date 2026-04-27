@@ -153,6 +153,18 @@ class ContainerServiceTest(TestCase):
         self.assertEqual(self.deployment.status, Deployment.Status.STOPPED)
 
     @patch('projects.services.get_docker_client')
+    def test_stop_container_failure(self, mock_get_client):
+        mock_client = MagicMock()
+        mock_get_client.return_value = mock_client
+        mock_client.containers.get.side_effect = Exception("Stop failed")
+
+        with self.assertRaises(Exception):
+            stop_container(self.deployment)
+
+        self.deployment.refresh_from_db()
+        self.assertEqual(self.deployment.status, Deployment.Status.FAILED)
+
+    @patch('projects.services.get_docker_client')
     def test_restart_container(self, mock_get_client):
         mock_client = MagicMock()
         mock_get_client.return_value = mock_client
@@ -164,6 +176,18 @@ class ContainerServiceTest(TestCase):
         mock_container.restart.assert_called_once()
         self.deployment.refresh_from_db()
         self.assertEqual(self.deployment.status, Deployment.Status.RUNNING)
+
+    @patch('projects.services.get_docker_client')
+    def test_restart_container_failure(self, mock_get_client):
+        mock_client = MagicMock()
+        mock_get_client.return_value = mock_client
+        mock_client.containers.get.side_effect = Exception("Restart failed")
+
+        with self.assertRaises(Exception):
+            restart_container(self.deployment)
+
+        self.deployment.refresh_from_db()
+        self.assertEqual(self.deployment.status, Deployment.Status.FAILED)
 
     @patch('projects.services.get_docker_client')
     def test_remove_container(self, mock_get_client):
@@ -336,6 +360,16 @@ class LogsServiceTest(TestCase):
         mock_client = MagicMock()
         mock_get_client.return_value = mock_client
         mock_client.containers.get.side_effect = docker.errors.NotFound("Not found")
+
+        logs = get_deployment_logs(self.deployment)
+
+        self.assertEqual(logs, "")
+
+    @patch('projects.services.get_docker_client')
+    def test_get_deployment_logs_exception(self, mock_get_client):
+        mock_client = MagicMock()
+        mock_get_client.return_value = mock_client
+        mock_client.containers.get.side_effect = Exception("Log error")
 
         logs = get_deployment_logs(self.deployment)
 
