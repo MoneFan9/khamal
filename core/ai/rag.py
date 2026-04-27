@@ -29,33 +29,45 @@ class RCAPromptBuilder:
 
     SYSTEM_PROMPT = (
         "You are an expert DevOps and System Reliability Engineer (SRE). "
-        "Your goal is to analyze application logs to perform a Root Cause Analysis (RCA). "
-        "Be concise, technical, and provide actionable solutions."
+        "Your goal is to analyze application logs to perform a Root Cause Analysis (RCA).\n\n"
+        "Guidelines:\n"
+        "1. **Think step-by-step**: Before providing the final RCA, mentally analyze the sequence of events in the logs.\n"
+        "2. **Evidence-based**: Only claim a root cause if there is direct evidence in the logs. If unsure, state multiple possibilities.\n"
+        "3. **Anti-Hallucination**: Do not invent logs, file paths, or error messages that are not present in the provided context.\n"
+        "4. **Conciseness**: Be technical and direct. Avoid fluff.\n"
+        "5. **Actionable**: Provide specific commands or code snippets for resolution."
     )
 
     TOOL_ENABLED_SYSTEM_PROMPT = (
         SYSTEM_PROMPT +
-        " If you identify a clear code or configuration fix, use the 'propose_fix' tool "
-        "to suggest a structured JSON patch."
+        "\n\n**Tool Usage (propose_fix)**:\n"
+        "- If you identify a definitive fix, use the 'propose_fix' tool.\n"
+        "- Ensure the 'search_block' is an EXACT match of the code in the file. If you are unsure of the exact block, provide the full 'content' and set 'search_block' to null.\n"
+        "- The output must be valid, deterministic JSON."
     )
 
     RCA_TEMPLATE = """
-### Context
-- **Project**: {project_name}
-- **Language/Framework**: {language}
-- **Environment**: {environment}
+### Environment Context
+- **Project Name**: {project_name}
+- **Primary Language/Framework**: {language}
+- **Deployment Environment**: {environment}
 
-### Analysis Request
-The following logs have been preprocessed to isolate the most relevant error signals.
-Please analyze them and provide:
-1. **Problem Summary**: What exactly is failing?
-2. **Root Cause Identification**: Why is it failing? (e.g., missing dependency, DB connection timeout, syntax error)
-3. **Actionable Resolution**: How can the user fix this? Provide code snippets or commands if applicable.
+### Task
+Analyze the following preprocessed logs to perform a technical Root Cause Analysis (RCA).
 
-### Logs
+### Instructions
+1. **Analyze logs**: Look for exceptions, stack traces, and error codes.
+2. **Problem Summary**: Briefly describe the visible failure.
+3. **Root Cause Analysis**: Identify the underlying issue based on log evidence.
+4. **Actionable Resolution**: Provide the exact steps to fix the issue.
+
+### Logs (Chronological)
 ```
 {logs}
 ```
+
+---
+**Response Format**: Use clear Markdown headers.
 """
 
     KNOWN_CONTEXT_KEYS = {"project_name", "language", "environment"}
