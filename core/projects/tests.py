@@ -137,3 +137,29 @@ class ProjectSerializerTest(TestCase):
         project = serializer.save()
 
         self.assertFalse(LocalSource.objects.filter(project=project).exists())
+
+class ProjectViewTest(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="viewuser", password="password")
+        self.other_user = User.objects.create_user(username="otheruser", password="password")
+        self.project = Project.objects.create(name="View Project", owner=self.user)
+        self.deployment = Deployment.objects.create(project=self.project)
+
+    def test_deployment_logs_view_owner(self):
+        self.client.login(username="viewuser", password="password")
+        url = reverse('deployment-logs', kwargs={'deployment_id': self.deployment.id})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, 'projects/deployment_logs.html')
+
+    def test_deployment_logs_view_not_owner(self):
+        self.client.login(username="otheruser", password="password")
+        url = reverse('deployment-logs', kwargs={'deployment_id': self.deployment.id})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 404)
+
+    def test_deployment_logs_view_unauthenticated(self):
+        url = reverse('deployment-logs', kwargs={'deployment_id': self.deployment.id})
+        response = self.client.get(url)
+        # Should redirect to login
+        self.assertEqual(response.status_code, 302)
