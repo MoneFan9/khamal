@@ -16,7 +16,6 @@ is_pro_available = all(app in settings.INSTALLED_APPS for app in pro_apps)
 
 if is_pro_available:
     try:
-        import pro
         urlpatterns += [
             path("api/servers/", include("pro.servers.urls")),
             path("api/pro/ai-support/", include("pro.ai_support.urls")),

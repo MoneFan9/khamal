@@ -57,6 +57,23 @@ class LogSagePreprocessor:
         """
         return [log for i, log in enumerate(logs) if i == 0 or log != logs[i-1]]
 
+    def _prioritize_logs(self, logs: List[str]) -> List[str]:
+        """
+        Prioritizes logs by severity with a recency bias to maintain context.
+        """
+        total_logs = len(logs)
+        scored_logs = sorted(
+            [
+                (self.get_severity_score(log) + (i / total_logs) * 10, i, log)
+                for i, log in enumerate(logs)
+            ],
+            key=lambda x: x[0],
+            reverse=True
+        )[:self.max_output_lines]
+
+        # Re-sort chronologically
+        return [log for _, i, log in sorted(scored_logs, key=lambda x: x[1])]
+
     def process(self, raw_logs: str) -> List[str]:
         """
         Main algorithm: filters noise, deduplicates, and prioritizes critical errors.
@@ -71,28 +88,4 @@ class LogSagePreprocessor:
         if len(deduplicated) <= self.max_output_lines:
             return deduplicated
 
-        # Prioritize by severity with a recency bias to maintain context
-        scores = [
-            self.get_severity_score(log) + (i / len(deduplicated)) * 10
-            for i, log in enumerate(deduplicated)
-        ]
-
-        # Boost scores of surrounding lines for high-severity logs (context window)
-        final_scores = list(scores)
-        for i, score in enumerate(scores):
-            if score >= 80:  # ERROR or higher
-                for j in range(max(0, i - self.context_window), min(len(deduplicated), i + self.context_window + 1)):
-                    if j != i:
-                        final_scores[j] = max(final_scores[j], 50)  # Boost context lines
-
-        scored_logs = sorted(
-            [
-                (final_scores[i], i, log)
-                for i, log in enumerate(deduplicated)
-            ],
-            key=lambda x: x[0],
-            reverse=True
-        )[:self.max_output_lines]
-
-        # Re-sort chronologically
-        return [log for _, i, log in sorted(scored_logs, key=lambda x: x[1])]
+        return self._prioritize_logs(deduplicated)
