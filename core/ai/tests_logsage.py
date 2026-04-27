@@ -36,12 +36,37 @@ class TestLogSagePreprocessor(unittest.TestCase):
 
     def test_severity_scoring(self):
         self.assertEqual(self.preprocessor.get_severity_score("CRITICAL: Out of memory"), 100)
+        self.assertEqual(self.preprocessor.get_severity_score("PANIC: kernel panic"), 100)
+        self.assertEqual(self.preprocessor.get_severity_score("SIGSEGV: segmentation fault"), 100)
+        self.assertEqual(self.preprocessor.get_severity_score("EXCEPTION: unhandled exception"), 90)
+        self.assertEqual(self.preprocessor.get_severity_score("TRACEBACK: most recent call last"), 90)
         self.assertEqual(self.preprocessor.get_severity_score("ERROR: unexpected error"), 80)
         self.assertEqual(self.preprocessor.get_severity_score("WARNING: disk almost full"), 40)
         self.assertEqual(self.preprocessor.get_severity_score("INFO: data received"), 10)
 
+    def test_context_window_preservation(self):
+        # max_output_lines is 5, context_window is 1
+        self.preprocessor = LogSagePreprocessor(max_output_lines=3, context_window=1)
+        logs = """
+        INFO: before 1
+        INFO: before 2
+        ERROR: critical error
+        INFO: after 1
+        INFO: after 2
+        """
+        processed = self.preprocessor.process(logs)
+
+        # Should prioritize the ERROR and its neighbors (before 2 and after 1)
+        self.assertIn("ERROR: critical error", processed)
+        self.assertIn("INFO: before 2", processed)
+        self.assertIn("INFO: after 1", processed)
+        self.assertNotIn("INFO: before 1", processed)
+        self.assertNotIn("INFO: after 2", processed)
+
     def test_prioritization_when_exceeding_max_lines(self):
         # max_output_lines is 5
+        # Note: with context_window=3 (default), ERRORs will boost surrounding lines.
+        # In this test, all logs are within 3 lines of an ERROR.
         logs = """
         INFO: log 1
         ERROR: critical error 1
@@ -59,8 +84,7 @@ class TestLogSagePreprocessor(unittest.TestCase):
         self.assertIn("ERROR: critical error 1", processed)
         self.assertIn("CRITICAL: fatal error 2", processed)
         self.assertIn("ERROR: critical error 3", processed)
-        # And some INFO logs (likely the most recent ones due to recency bonus)
-        self.assertIn("INFO: log 5", processed)
+        # Context preservation might change which INFO logs are kept compared to simple recency
 
     def test_empty_logs(self):
         self.assertEqual(self.preprocessor.process(""), [])

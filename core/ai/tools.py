@@ -5,36 +5,36 @@ PROPOSE_FIX_TOOL: Dict[str, Any] = {
     "function": {
         "name": "propose_fix",
         "description": "Propose a structured JSON fix to resolve the identified root cause. "
-                       "This should only be called if a clear, actionable code or configuration change is identified.",
+                       "Use this ONLY when a definitive code or configuration change is identified.",
         "parameters": {
             "type": "object",
             "properties": {
                 "rationale": {
                     "type": "string",
-                    "description": "Short explanation of why these changes will fix the issue."
+                    "description": "Concise technical explanation of why these changes resolve the root cause."
                 },
                 "changes": {
                     "type": "array",
-                    "description": "A list of file-level changes to apply.",
+                    "description": "List of atomic file-level changes. Be precise with paths.",
                     "items": {
                         "type": "object",
                         "properties": {
                             "file_path": {
                                 "type": "string",
-                                "description": "Relative path to the file that needs modification (e.g., 'src/app.py')."
+                                "description": "Relative path from project root (e.g., 'src/models.py')."
                             },
                             "action": {
                                 "type": "string",
                                 "enum": ["update", "create", "delete"],
-                                "description": "The type of action to perform on the file."
+                                "description": "Type of modification."
                             },
                             "content": {
                                 "type": "string",
-                                "description": "The full content of the file (for 'create') or the specific code block/patch (for 'update')."
+                                "description": "For 'update', the new code block. For 'create', the full file content."
                             },
                             "search_block": {
                                 "type": "string",
-                                "description": "For 'update' actions, the exact block of code to find and replace. If null, 'content' is assumed to be the new full file content."
+                                "description": "The EXACT code block to replace. Must be unique in the file. If null, 'content' will overwrite the entire file."
                             }
                         },
                         "required": ["file_path", "action", "content"]

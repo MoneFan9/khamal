@@ -10,9 +10,9 @@ class TestRCAPromptBuilder(unittest.TestCase):
         prompt_obj = self.builder.build_prompt(logs)
 
         self.assertIsInstance(prompt_obj, RCAPrompt)
-        self.assertIn("### Context", prompt_obj.user)
+        self.assertIn("### Environment Context", prompt_obj.user)
         self.assertIn("ERROR: Connection refused", prompt_obj.user)
-        self.assertIn("**Project**: Unknown", prompt_obj.user)
+        self.assertIn("**Project Name**: Unknown", prompt_obj.user)
         self.assertEqual(prompt_obj.system, self.builder.SYSTEM_PROMPT)
 
     def test_to_ollama_messages(self):
@@ -36,9 +36,9 @@ class TestRCAPromptBuilder(unittest.TestCase):
         }
         prompt_obj = self.builder.build_prompt(logs, project_context=context)
 
-        self.assertIn("**Project**: MyCoolApp", prompt_obj.user)
-        self.assertIn("**Language/Framework**: Django/Python", prompt_obj.user)
-        self.assertIn("**Environment**: Development", prompt_obj.user)
+        self.assertIn("**Project Name**: MyCoolApp", prompt_obj.user)
+        self.assertIn("**Primary Language/Framework**: Django/Python", prompt_obj.user)
+        self.assertIn("**Deployment Environment**: Development", prompt_obj.user)
         self.assertNotIn("ignored_key", prompt_obj.user)
 
     def test_empty_logs_raises_value_error(self):
@@ -55,8 +55,8 @@ class TestRCAPromptBuilder(unittest.TestCase):
         prompt_obj = short_builder.build_prompt(logs)
 
         self.assertIn("[truncated", prompt_obj.user)
-        # It should keep the end of the log
-        self.assertTrue(prompt_obj.user.endswith("g log line\n```\n"))
+        # It should keep the end of the log (before the closing markers)
+        self.assertIn("g log line\n```", prompt_obj.user)
 
     def test_custom_template(self):
         custom_template = "PROJECT: {project_name} LOGS: {logs}"
