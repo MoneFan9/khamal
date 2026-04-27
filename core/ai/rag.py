@@ -72,6 +72,32 @@ Please analyze them and provide:
         self.max_log_chars = max_log_chars
         self.enable_tools = enable_tools
 
+    def _get_merged_context(self, project_context: Optional[dict[str, str]]) -> dict[str, str]:
+        """
+        Returns the merged project context with default values.
+        """
+        context = {
+            "project_name": "Unknown",
+            "language": "Auto-detected",
+            "environment": "Production",
+        }
+        if project_context:
+            context.update({k: v for k, v in project_context.items() if k in self.KNOWN_CONTEXT_KEYS})
+        return context
+
+    def _format_logs(self, logs: list[str]) -> str:
+        """
+        Sanitizes, joins, and truncates logs if necessary.
+        """
+        sanitized_logs = [str(log).strip() for log in (logs or []) if log is not None]
+        if not sanitized_logs:
+            raise ValueError("logs must be a non-empty list of strings.")
+
+        formatted_logs = "\n".join(sanitized_logs)
+        if len(formatted_logs) > self.max_log_chars:
+            return f"... [truncated — showing last portion] ...\n{formatted_logs[-self.max_log_chars:]}"
+        return formatted_logs
+
     def build_prompt(
         self,
         logs: list[str],
@@ -80,21 +106,8 @@ Please analyze them and provide:
         """
         Formats logs and context into a structured RCAPrompt.
         """
-        sanitized_logs = [str(log).strip() for log in (logs or []) if log is not None]
-        if not sanitized_logs:
-            raise ValueError("logs must be a non-empty list of strings.")
-
-        context = {
-            "project_name": "Unknown",
-            "language": "Auto-detected",
-            "environment": "Production",
-        }
-        if project_context:
-            context.update({k: v for k, v in project_context.items() if k in self.KNOWN_CONTEXT_KEYS})
-
-        formatted_logs = "\n".join(sanitized_logs)
-        if len(formatted_logs) > self.max_log_chars:
-            formatted_logs = f"... [truncated — showing last portion] ...\n{formatted_logs[-self.max_log_chars:]}"
+        context = self._get_merged_context(project_context)
+        formatted_logs = self._format_logs(logs)
 
         user_content = self._rca_template.format(
             project_name=context["project_name"],

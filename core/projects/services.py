@@ -354,6 +354,26 @@ def _wait_for_healthy(container, timeout: int = 60):
         time.sleep(2)
     return False
 
+def _get_db_config(engine: str, project_id: int) -> tuple[dict, dict]:
+    """
+    Returns the environment variables and volume mappings for the database engine.
+    """
+    environment = {}
+    if engine == "postgres":
+        environment = {
+            "POSTGRES_DB": "khamal",
+            "POSTGRES_USER": "khamal",
+            "POSTGRES_PASSWORD": secrets.token_urlsafe(16)
+        }
+
+    volumes = {
+        f"khamal-data-{engine}-{project_id}": {
+            "bind": "/var/lib/postgresql/data" if engine == "postgres" else "/data",
+            "mode": "rw"
+        }
+    }
+    return environment, volumes
+
 def provision_database(project: Project, engine: str):
     """
     Provisions a database container (PostgreSQL or Redis) for the project.
@@ -374,20 +394,7 @@ def provision_database(project: Project, engine: str):
     except docker.errors.NotFound:
         logger.info(f"Provisioning new {engine} container: {container_name}")
 
-    environment = {}
-    if engine == "postgres":
-        environment = {
-            "POSTGRES_DB": "khamal",
-            "POSTGRES_USER": "khamal",
-            "POSTGRES_PASSWORD": secrets.token_urlsafe(16)
-        }
-
-    volumes = {
-        f"khamal-data-{engine}-{project.id}": {
-            "bind": "/var/lib/postgresql/data" if engine == "postgres" else "/data",
-            "mode": "rw"
-        }
-    }
+    environment, volumes = _get_db_config(engine, project.id)
 
     try:
         container = client.containers.run(

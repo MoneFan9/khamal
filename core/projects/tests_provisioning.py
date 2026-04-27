@@ -30,7 +30,7 @@ class ProvisioningTest(TestCase):
 
         mock_client.containers.run.assert_called_once()
         args, kwargs = mock_client.containers.run.call_args
-        self.assertEqual(args[0], "postgres:16")
+        self.assertEqual(args[0], "postgres:16-alpine")
         self.assertEqual(kwargs['name'], f"khamal-db-postgres-{self.project.id}")
         self.assertEqual(kwargs['network'], "khamal-project-net")
         self.assertIn("POSTGRES_PASSWORD", kwargs['environment'])
