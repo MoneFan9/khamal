@@ -60,19 +60,53 @@ class LogSagePreprocessor:
     def _prioritize_logs(self, logs: List[str]) -> List[str]:
         """
         Prioritizes logs by severity with a recency bias to maintain context.
+        Also includes context_window around high-severity logs.
         """
         total_logs = len(logs)
-        scored_logs = sorted(
+        if total_logs == 0:
+            return []
+
+        scored_indices = sorted(
             [
-                (self.get_severity_score(log) + (i / total_logs) * 10, i, log)
+                (self.get_severity_score(log) + (i / total_logs) * 10, i)
                 for i, log in enumerate(logs)
             ],
             key=lambda x: x[0],
             reverse=True
-        )[:self.max_output_lines]
+        )
+
+        selected_indices = set()
+
+        # Phase 1: Add high-severity logs themselves first (anchors)
+        for score, i in scored_indices:
+            if score >= 80:
+                if len(selected_indices) < self.max_output_lines:
+                    selected_indices.add(i)
+            else:
+                break
+
+        # Phase 2: Add context window around high-severity logs
+        if len(selected_indices) < self.max_output_lines:
+            for score, i in scored_indices:
+                if score >= 80:
+                    context = range(max(0, i - self.context_window), min(total_logs, i + self.context_window + 1))
+                    for j in context:
+                        if j not in selected_indices:
+                            selected_indices.add(j)
+                            if len(selected_indices) >= self.max_output_lines:
+                                break
+                if len(selected_indices) >= self.max_output_lines:
+                    break
+
+        # Phase 3: Fill remaining space with other logs by priority
+        for score, i in scored_indices:
+            if len(selected_indices) >= self.max_output_lines:
+                break
+            if i not in selected_indices:
+                selected_indices.add(i)
 
         # Re-sort chronologically
-        return [log for _, i, log in sorted(scored_logs, key=lambda x: x[1])]
+        return [logs[i] for i in sorted(list(selected_indices))]
 
     def process(self, raw_logs: str) -> List[str]:
         """
