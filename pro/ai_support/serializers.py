@@ -6,9 +6,9 @@ class DiagnosticRequestSerializer(serializers.ModelSerializer):
         model = DiagnosticRequest
         fields = [
             "id", "server", "query", "routing",
-            "response", "is_successful", "created_at"
+            "response", "created_at"
         ]
-        read_only_fields = ["routing", "response", "is_successful", "created_at"]
+        read_only_fields = ["routing", "response", "created_at"]
 
 class DiagnosticInputSerializer(serializers.Serializer):
     server_id = serializers.IntegerField()
