@@ -57,6 +57,37 @@ class LogSagePreprocessor:
         """
         return [log for i, log in enumerate(logs) if i == 0 or log != logs[i-1]]
 
+    def _add_anchors(self, scored_indices: List[tuple], selected_indices: set):
+        """Phase 1: Add high-severity logs themselves first (anchors)."""
+        for score, i in scored_indices:
+            if score >= 80:
+                if len(selected_indices) < self.max_output_lines:
+                    selected_indices.add(i)
+            else:
+                break
+
+    def _add_context_window(self, scored_indices: List[tuple], selected_indices: set, total_logs: int):
+        """Phase 2: Add context window around high-severity logs."""
+        if len(selected_indices) < self.max_output_lines:
+            for score, i in scored_indices:
+                if score >= 80:
+                    context = range(max(0, i - self.context_window), min(total_logs, i + self.context_window + 1))
+                    for j in context:
+                        if j not in selected_indices:
+                            selected_indices.add(j)
+                            if len(selected_indices) >= self.max_output_lines:
+                                return
+                if len(selected_indices) >= self.max_output_lines:
+                    return
+
+    def _fill_remaining_quota(self, scored_indices: List[tuple], selected_indices: set):
+        """Phase 3: Fill remaining space with other logs by priority."""
+        for _, i in scored_indices:
+            if len(selected_indices) >= self.max_output_lines:
+                break
+            if i not in selected_indices:
+                selected_indices.add(i)
+
     def _prioritize_logs(self, logs: List[str]) -> List[str]:
         """
         Prioritizes logs by severity with a recency bias to maintain context.
@@ -77,33 +108,9 @@ class LogSagePreprocessor:
 
         selected_indices = set()
 
-        # Phase 1: Add high-severity logs themselves first (anchors)
-        for score, i in scored_indices:
-            if score >= 80:
-                if len(selected_indices) < self.max_output_lines:
-                    selected_indices.add(i)
-            else:
-                break
-
-        # Phase 2: Add context window around high-severity logs
-        if len(selected_indices) < self.max_output_lines:
-            for score, i in scored_indices:
-                if score >= 80:
-                    context = range(max(0, i - self.context_window), min(total_logs, i + self.context_window + 1))
-                    for j in context:
-                        if j not in selected_indices:
-                            selected_indices.add(j)
-                            if len(selected_indices) >= self.max_output_lines:
-                                break
-                if len(selected_indices) >= self.max_output_lines:
-                    break
-
-        # Phase 3: Fill remaining space with other logs by priority
-        for score, i in scored_indices:
-            if len(selected_indices) >= self.max_output_lines:
-                break
-            if i not in selected_indices:
-                selected_indices.add(i)
+        self._add_anchors(scored_indices, selected_indices)
+        self._add_context_window(scored_indices, selected_indices, total_logs)
+        self._fill_remaining_quota(scored_indices, selected_indices)
 
         # Re-sort chronologically
         return [logs[i] for i in sorted(list(selected_indices))]
