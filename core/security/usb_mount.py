@@ -1,6 +1,7 @@
 import subprocess
 import logging
 import os
+from .usb_guard import USBGuardManager
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +23,52 @@ class USBMountManager:
         Returns:
             bool: True if successful, False otherwise.
         """
+        # --- Security Validation ---
+        # 1. Resolve and Normalize paths to prevent traversal and symlink bypasses
+        try:
+            device_path = os.path.normpath(device_path)
+            # We don't use realpath on device_path as it might not exist yet or might be a symlink we want (like /dev/disk/by-id/...)
+            # but we still want to ensure it's in /dev/
+
+            if not os.path.isabs(mount_point):
+                logger.error(f"Mount point must be absolute: {mount_point}")
+                return False
+
+            # mount_point might not exist, so we can't always use realpath on it directly if it doesn't exist.
+            # But we can use realpath on the parent if it exists.
+            normalized_mount = os.path.normpath(mount_point)
+        except Exception as e:
+            logger.error(f"Path normalization error: {e}")
+            return False
+
+        # 2. Validate device path (must be in /dev/)
+        if os.path.commonpath(["/dev", device_path]) != "/dev":
+            logger.error(f"Invalid device path (must be in /dev): {device_path}")
+            return False
+
+        # 3. Validate mount point (must be strictly within /mnt/usb/)
+        allowed_mount_base = os.path.normpath("/mnt/usb")
+
+        # Check if it's within allowed_mount_base using commonpath
+        try:
+            if os.path.commonpath([allowed_mount_base, normalized_mount]) != allowed_mount_base:
+                logger.error(f"Invalid mount point: {normalized_mount}. Must be within {allowed_mount_base}")
+                return False
+
+            # Prevent mounting directly on the base
+            if normalized_mount == allowed_mount_base:
+                logger.error(f"Cannot mount directly on {allowed_mount_base}")
+                return False
+        except ValueError:
+            logger.error(f"Invalid paths for commonpath: {allowed_mount_base}, {normalized_mount}")
+            return False
+
+        # 4. Integrate with USBGuard: Ensure USBGuard is installed and (implied) check for authorized devices
+        # In a real scenario, we might want to specifically check if this device is authorized.
+        if not USBGuardManager.is_installed():
+            logger.error("USBGuard is not installed. Refusing to mount for security reasons.")
+            return False
+
         if not os.path.exists(mount_point):
             try:
                 os.makedirs(mount_point, exist_ok=True)

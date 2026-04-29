@@ -94,10 +94,13 @@ class ProjectSerializerTest(TestCase):
         self.user = User.objects.create_user(username="seruser", password="password")
 
     def test_create_project_with_local_source(self):
+        import os
+        from django.conf import settings
+        valid_host_path = os.path.abspath(os.path.join(str(settings.BASE_DIR), "test_path"))
         data = {
             "name": "Test Project",
             "local_source": {
-                "host_path": "/host/path",
+                "host_path": valid_host_path,
                 "container_path": "/container/path"
             }
         }
@@ -106,14 +109,17 @@ class ProjectSerializerTest(TestCase):
         project = serializer.save(owner=self.user)
 
         self.assertEqual(project.name, "Test Project")
-        self.assertEqual(project.local_source.host_path, "/host/path")
+        self.assertEqual(project.local_source.host_path, valid_host_path)
 
     def test_update_project_add_local_source(self):
+        import os
+        from django.conf import settings
+        valid_host_path = os.path.abspath(os.path.join(str(settings.BASE_DIR), "new_host"))
         project = Project.objects.create(name="Old Name", owner=self.user)
         data = {
             "name": "New Name",
             "local_source": {
-                "host_path": "/new/host",
+                "host_path": valid_host_path,
                 "container_path": "/new/container"
             }
         }
@@ -122,7 +128,7 @@ class ProjectSerializerTest(TestCase):
         project = serializer.save()
 
         self.assertEqual(project.name, "New Name")
-        self.assertEqual(project.local_source.host_path, "/new/host")
+        self.assertEqual(project.local_source.host_path, valid_host_path)
 
     def test_update_project_remove_local_source(self):
         project = Project.objects.create(name="Project", owner=self.user)
