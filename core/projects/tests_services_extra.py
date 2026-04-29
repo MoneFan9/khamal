@@ -6,7 +6,8 @@ from django.contrib.auth import get_user_model
 from projects.models import Project, Deployment
 from projects.services import (
     ensure_global_proxy, delete_project_network,
-    start_container, remove_container, provision_database
+    start_container, remove_container, provision_database,
+    _wait_for_healthy
 )
 
 @pytest.mark.django_db
@@ -103,6 +104,51 @@ class TestServicesExtra:
 
         result = provision_database(project, "postgres")
         assert result == existing_container
+
+    @patch("projects.services.get_docker_client")
+    def test_provision_database_general_api_error(self, mock_get_client, project):
+        client = MagicMock()
+        mock_get_client.return_value = client
+        project.network_id = "test-net"
+        project.save()
+
+        client.containers.get.side_effect = docker.errors.NotFound("Not found")
+
+        response = MagicMock()
+        response.status_code = 500
+        client.containers.run.side_effect = docker.errors.APIError("Server error", response=response)
+
+        with pytest.raises(docker.errors.APIError):
+            provision_database(project, "postgres")
+
+    def test_wait_for_healthy_success(self):
+        container = MagicMock()
+        container.attrs = {"State": {"Health": {"Status": "healthy"}}}
+        assert _wait_for_healthy(container, timeout=1) is True
+
+    def test_wait_for_healthy_running_no_healthcheck(self):
+        container = MagicMock()
+        container.attrs = {"State": {}}
+        container.status = "running"
+        assert _wait_for_healthy(container, timeout=1) is True
+
+    def test_wait_for_healthy_exited(self):
+        container = MagicMock()
+        container.attrs = {"State": {}}
+        container.status = "exited"
+        assert _wait_for_healthy(container, timeout=1) is False
+
+    @patch("projects.services.time.sleep")
+    @patch("projects.services.time.monotonic")
+    def test_wait_for_healthy_timeout(self, mock_monotonic, mock_sleep):
+        container = MagicMock()
+        container.attrs = {"State": {"Health": {"Status": "starting"}}}
+        container.status = "starting"
+
+        # Mocking time to simulate a timeout
+        mock_monotonic.side_effect = [0, 10, 70]
+
+        assert _wait_for_healthy(container, timeout=60) is False
 
 @pytest.fixture
 def user(db):

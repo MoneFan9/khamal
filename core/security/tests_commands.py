@@ -37,3 +37,13 @@ class USBGuardSetupCommandTests(SimpleTestCase):
         call_command("usbguard_setup", stderr=out)
 
         self.assertIn("Failed to apply USBGuard policy", out.getvalue())
+
+    @patch("security.management.commands.usbguard_setup.USBGuardManager")
+    def test_usbguard_setup_generate_failure(self, mock_manager):
+        mock_manager.is_installed.return_value = True
+        mock_manager.generate_policy.return_value = None
+
+        out = StringIO()
+        call_command("usbguard_setup", stderr=out)
+
+        self.assertIn("Failed to generate initial policy.", out.getvalue())
