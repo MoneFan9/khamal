@@ -24,7 +24,6 @@ class DiagnosticRequest(models.Model):
         db_index=True
     )
     response = models.TextField(blank=True, null=True)
-    is_successful = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
