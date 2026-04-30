@@ -60,29 +60,33 @@ class USBGuardTests(TestCase):
 
 class USBMountTests(TestCase):
 
+    @patch("security.usb_mount.USBGuardManager.is_installed")
     @patch("os.path.exists")
     @patch("os.makedirs")
     @patch("subprocess.run")
-    def test_mount_volume_success(self, mock_run, mock_makedirs, mock_exists):
+    def test_mount_volume_success(self, mock_run, mock_makedirs, mock_exists, mock_usbguard):
+        mock_usbguard.return_value = True
         mock_exists.return_value = False
         mock_run.return_value = MagicMock(returncode=0)
 
-        result = USBMountManager.mount_volume("/dev/sdb1", "/mnt/usb")
+        result = USBMountManager.mount_volume("/dev/sdb1", "/mnt/usb/stick")
 
         self.assertTrue(result)
-        mock_makedirs.assert_called_once_with("/mnt/usb", exist_ok=True)
+        mock_makedirs.assert_called_once_with("/mnt/usb/stick", exist_ok=True)
         mock_run.assert_called_with(
-            ["sudo", "mount", "-o", "noexec,nosuid,nodev", "/dev/sdb1", "/mnt/usb"],
+            ["sudo", "mount", "-o", "noexec,nosuid,nodev", "/dev/sdb1", "/mnt/usb/stick"],
             check=True, capture_output=True, text=True
         )
 
+    @patch("security.usb_mount.USBGuardManager.is_installed")
     @patch("os.path.exists")
     @patch("subprocess.run")
-    def test_mount_volume_failure(self, mock_run, mock_exists):
+    def test_mount_volume_failure(self, mock_run, mock_exists, mock_usbguard):
+        mock_usbguard.return_value = True
         mock_exists.return_value = True
         mock_run.side_effect = subprocess.CalledProcessError(1, "mount", stderr="Permission denied")
 
-        result = USBMountManager.mount_volume("/dev/sdb1", "/mnt/usb")
+        result = USBMountManager.mount_volume("/dev/sdb1", "/mnt/usb/stick")
 
         self.assertFalse(result)
 

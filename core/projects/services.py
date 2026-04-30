@@ -308,6 +308,8 @@ def create_deployment_container(deployment: Deployment, image: str):
         volumes = _get_deployment_volumes(deployment)
 
         network_obj = client.networks.get(project_network_id)
+        # SECURITY: Never use privileged=True, cap_add, or other privilege escalation flags.
+        # Least privilege is enforced via the docker-socket-proxy and isolated networks.
         container = client.containers.run(
             image,
             detach=True,
@@ -397,6 +399,7 @@ def provision_database(project: Project, engine: str):
     environment, volumes = _get_db_config(engine, project.id)
 
     try:
+        # SECURITY: Privileged mode and cap_add are strictly forbidden.
         container = client.containers.run(
             image,
             name=container_name,

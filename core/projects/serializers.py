@@ -1,3 +1,5 @@
+import os
+from django.conf import settings
 from rest_framework import serializers
 from .models import Project, Deployment
 from local.models import LocalSource
@@ -6,6 +8,27 @@ class LocalSourceSerializer(serializers.ModelSerializer):
     class Meta:
         model = LocalSource
         fields = ['host_path', 'container_path']
+
+    def validate_host_path(self, value):
+        """
+        Validates that the host_path is absolute, normalized, and within an allowed directory.
+        """
+        # Ensure it's an absolute path
+        if not os.path.isabs(value):
+            raise serializers.ValidationError("host_path must be an absolute path.")
+
+        # Normalize the path to remove .. and other traversal sequences
+        # We use realpath to resolve any symlinks and prevent bypasses
+        try:
+            target_path = os.path.realpath(value)
+            allowed_base = os.path.realpath(str(settings.BASE_DIR))
+        except Exception as e:
+            raise serializers.ValidationError(f"Path resolution error: {e}")
+
+        if os.path.commonpath([allowed_base, target_path]) != allowed_base:
+            raise serializers.ValidationError(f"Access to {value} is denied. Paths must be within {allowed_base}")
+
+        return target_path
 
 class ProjectSerializer(serializers.ModelSerializer):
     owner_username = serializers.ReadOnlyField(source='owner.username')
