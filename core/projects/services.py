@@ -18,6 +18,35 @@ DATABASE_IMAGES = {
     "redis": "redis:7-alpine",
 }
 
+def _get_traefik_config() -> tuple[list[str], dict]:
+    """
+    Builds the Traefik command and volumes configuration.
+    """
+    command = [
+        "--providers.docker=true",
+        "--providers.docker.exposedbydefault=false",
+        f"--providers.docker.network={PROXY_NETWORK_NAME}",
+        "--entrypoints.web.address=:80",
+        "--entrypoints.websecure.address=:443",
+    ]
+
+    volumes = {
+        '/var/run/docker.sock': {'bind': '/var/run/docker.sock', 'mode': 'ro'}
+    }
+
+    if settings.KHAMAL_SSL_ENABLED:
+        command.extend([
+            "--certificatesresolvers.le.acme.email=" + settings.KHAMAL_ACME_EMAIL,
+            "--certificatesresolvers.le.acme.storage=" + settings.KHAMAL_ACME_STORAGE,
+            "--certificatesresolvers.le.acme.tlschallenge=true",
+            "--certificatesresolvers.le.acme.caserver=" + settings.KHAMAL_ACME_CA_SERVER,
+            "--entrypoints.web.http.redirections.entryPoint.to=websecure",
+            "--entrypoints.web.http.redirections.entryPoint.scheme=https",
+        ])
+        volumes['khamal-letsencrypt'] = {'bind': '/letsencrypt', 'mode': 'rw'}
+
+    return command, volumes
+
 def ensure_global_proxy():
     """
     Ensures the global Traefik proxy and its network exist.
@@ -40,30 +69,7 @@ def ensure_global_proxy():
         client.containers.get(TRAEFIK_CONTAINER_NAME)
     except docker.errors.NotFound:
         logger.info(f"Creating global Traefik container: {TRAEFIK_CONTAINER_NAME}")
-
-        command = [
-            "--providers.docker=true",
-            "--providers.docker.exposedbydefault=false",
-            f"--providers.docker.network={PROXY_NETWORK_NAME}",
-            "--entrypoints.web.address=:80",
-            "--entrypoints.websecure.address=:443",
-        ]
-
-        volumes = {
-            '/var/run/docker.sock': {'bind': '/var/run/docker.sock', 'mode': 'ro'}
-        }
-
-        if settings.KHAMAL_SSL_ENABLED:
-            command.extend([
-                "--certificatesresolvers.le.acme.email=" + settings.KHAMAL_ACME_EMAIL,
-                "--certificatesresolvers.le.acme.storage=" + settings.KHAMAL_ACME_STORAGE,
-                "--certificatesresolvers.le.acme.tlschallenge=true",
-                "--certificatesresolvers.le.acme.caserver=" + settings.KHAMAL_ACME_CA_SERVER,
-                "--entrypoints.web.http.redirections.entryPoint.to=websecure",
-                "--entrypoints.web.http.redirections.entryPoint.scheme=https",
-            ])
-            # Persist certificates
-            volumes['khamal-letsencrypt'] = {'bind': '/letsencrypt', 'mode': 'rw'}
+        command, volumes = _get_traefik_config()
 
         client.containers.run(
             TRAEFIK_IMAGE,
@@ -71,11 +77,7 @@ def ensure_global_proxy():
             detach=True,
             restart_policy={"Name": "always"},
             network=PROXY_NETWORK_NAME,
-            ports={
-                '80/tcp': 80,
-                '443/tcp': 443,
-                '8080/tcp': 8080
-            },
+            ports={'80/tcp': 80, '443/tcp': 443, '8080/tcp': 8080},
             volumes=volumes,
             command=command,
             labels={"khamal.managed": "true"}
@@ -342,12 +344,10 @@ def _wait_for_healthy(container, timeout: int = 60):
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         container.reload()
-        # If the container has a health check, wait for it
-        health = container.attrs.get("State", {}).get("Health", {}).get("Status")
-        if health == "healthy":
-            return True
-        # If no health check, just wait for 'running' status
-        if health is None and container.status == "running":
+        state = container.attrs.get("State", {})
+        health = state.get("Health", {}).get("Status")
+
+        if health == "healthy" or (health is None and container.status == "running"):
             return True
 
         if container.status == "exited":
