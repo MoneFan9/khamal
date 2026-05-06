@@ -15,13 +15,10 @@ pro_apps = ["pro.white_label", "pro.servers", "pro.ai_support"]
 is_pro_available = all(app in settings.INSTALLED_APPS for app in pro_apps)
 
 if is_pro_available:
-    try:
-        urlpatterns += [
-            path("api/servers/", include("pro.servers.urls")),
-            path("api/pro/ai-support/", include("pro.ai_support.urls")),
-        ]
-    except ImportError:
-        pass
+    urlpatterns += [
+        path("api/servers/", include("pro.servers.urls")),
+        path("api/pro/ai-support/", include("pro.ai_support.urls")),
+    ]
 
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
