@@ -26,4 +26,4 @@ class DeploymentListCreateAPIView(generics.ListCreateAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        return self.queryset.filter(project__owner=self.request.user)
+        return self.queryset.filter(project__owner=self.request.user).select_related('project')

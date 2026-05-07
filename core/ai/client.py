@@ -4,9 +4,10 @@ from django.conf import settings
 class OllamaClient:
     def __init__(self, base_url=None):
         self.base_url = base_url or getattr(settings, "OLLAMA_URL", "http://localhost:11434")
+        self.keep_alive = getattr(settings, "OLLAMA_KEEP_ALIVE", "5m")
         self.api_url = f"{self.base_url}/api"
 
-    def generate(self, model, prompt, system=None, template=None, context=None, options=None, stream=False):
+    def generate(self, model, prompt, system=None, template=None, context=None, options=None, stream=False, keep_alive=None):
         """
         Generate a response for a given prompt with a provided model.
         """
@@ -14,6 +15,7 @@ class OllamaClient:
             "model": model,
             "prompt": prompt,
             "stream": stream,
+            "keep_alive": keep_alive if keep_alive is not None else self.keep_alive,
         }
         if system:
             payload["system"] = system
@@ -31,7 +33,7 @@ class OllamaClient:
             return response.iter_lines()
         return response.json()
 
-    def chat(self, model, messages, tools=None, options=None, stream=False):
+    def chat(self, model, messages, tools=None, options=None, stream=False, keep_alive=None):
         """
         Generate the next message in a chat with a provided model.
         """
@@ -39,6 +41,7 @@ class OllamaClient:
             "model": model,
             "messages": messages,
             "stream": stream,
+            "keep_alive": keep_alive if keep_alive is not None else self.keep_alive,
         }
         if tools:
             payload["tools"] = tools
