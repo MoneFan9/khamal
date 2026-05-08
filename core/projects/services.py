@@ -321,8 +321,11 @@ def create_deployment_container(deployment: Deployment, image: str):
 
         # SECURITY: Least Privilege Enforcement
         # 1. We use a dedicated, isolated bridge network for each project.
+        #    This prevents cross-project container communication unless explicitly routed.
         # 2. Privileged mode and capability additions are strictly forbidden.
+        #    Khamal enforces a "No-Escalation" policy for user-defined containers.
         # 3. All Docker API calls are proxied through docker-socket-proxy.
+        #    We do not mount /var/run/docker.sock into the orchestrator logic.
         container = client.containers.run(
             image,
             detach=True,

@@ -5,33 +5,46 @@
 
 set -e
 
-echo "🦁 Welcome to Khamal Installation"
+# ANSI color codes
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+NC='\033[0m' # No Color
+
+echo -e "${BLUE}🦁 Welcome to Khamal Installation${NC}"
 echo "----------------------------------"
 
 # 1. Prerequisite Checks
-echo "🔍 Checking prerequisites..."
+echo -e "${BLUE}🔍 Checking prerequisites...${NC}"
 
 if ! command -v docker &> /dev/null; then
-    echo "❌ Docker is not installed. Please install Docker and try again."
+    echo -e "${RED}❌ Docker is not installed. Please install Docker and try again.${NC}"
+    exit 1
+fi
+
+# Check if Docker daemon is running
+if ! docker info &> /dev/null; then
+    echo -e "${RED}❌ Docker daemon is not running. Please start Docker and try again.${NC}"
     exit 1
 fi
 
 if ! command -v python3 &> /dev/null; then
-    echo "❌ Python 3 is not installed. Please install Python 3 and try again."
+    echo -e "${RED}❌ Python 3 is not installed. Please install Python 3 and try again.${NC}"
     exit 1
 fi
 
 if ! command -v nixpacks &> /dev/null; then
-    echo "⚠️  Nixpacks is not installed. It is required for building images."
+    echo -e "${YELLOW}⚠️  Nixpacks is not installed. It is required for building images.${NC}"
     echo "👉 Install it via: curl -sSL https://nixpacks.com/install.sh | bash"
 fi
 
 # 2. Environment Setup
-echo "📁 Setting up environment..."
+echo -e "${BLUE}📁 Setting up environment...${NC}"
 if [ ! -f .env ]; then
     echo "📝 Creating .env from .env.example..."
     cp core/.env.example .env
-    # Generate a secret key using Python for portability (avoiding sed -i issues)
+    # Generate a secret key using Python for portability
     SECRET=$(python3 -c 'import secrets; print(secrets.token_urlsafe(50))')
     python3 -c "
 import sys
@@ -39,25 +52,27 @@ content = open('.env').read().replace('your-secret-key-here', '$SECRET')
 with open('.env', 'w') as f:
     f.write(content)
 "
-    echo "✅ .env created. Please review it later for custom configurations."
+    echo -e "${GREEN}✅ .env created. Please review it later for custom configurations.${NC}"
 else
     echo "ℹ️  .env file already exists, skipping."
 fi
 
 # 3. Dependency Installation
-echo "📦 Installing dependencies..."
-python3 -m venv venv
+echo -e "${BLUE}📦 Installing dependencies...${NC}"
+if [ ! -d "venv" ]; then
+    python3 -m venv venv
+fi
 source venv/bin/activate
 pip install --upgrade pip
 pip install -r core/requirements.txt
 
 # 4. Database Migrations
-echo "🗄️  Running database migrations..."
+echo -e "${BLUE}🗄️  Running database migrations...${NC}"
 export PYTHONPATH=core:.
 python3 core/manage.py migrate
 
 # 5. Core Services Initialization
-echo "🚀 Initializing core services..."
+echo -e "${BLUE}🚀 Initializing core services...${NC}"
 
 # Start docker-socket-proxy if not running (simple version for single-node)
 # Binds to 127.0.0.1 for security.
@@ -82,7 +97,10 @@ echo "🌐 Setting up Traefik proxy..."
 python3 core/manage.py setup_traefik
 
 echo "----------------------------------"
-echo "✅ Khamal installation completed successfully!"
-echo "✨ To start the server, run: source venv/bin/activate && python3 core/manage.py runserver"
-echo "✨ To monitor containers, run: python3 core/manage.py monitor_containers"
+echo -e "${GREEN}✅ Khamal installation completed successfully!${NC}"
+echo -e "${BLUE}✨ Next steps:${NC}"
+echo -e "  1. Activate the environment: ${YELLOW}source venv/bin/activate${NC}"
+echo -e "  2. Start the Khamal server:  ${YELLOW}python3 core/manage.py runserver${NC}"
+echo -e "  3. Monitor your containers:  ${YELLOW}python3 core/manage.py monitor_containers${NC}"
+echo -e "  4. Access the dashboard:     ${BLUE}http://localhost:8000${NC}"
 echo "----------------------------------"

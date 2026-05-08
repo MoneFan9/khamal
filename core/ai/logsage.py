@@ -93,11 +93,20 @@ class LogSagePreprocessor:
 
     def _prioritize_logs(self, logs: List[str]) -> List[str]:
         """
-        Implementation of the Multi-Phase Prioritization Strategy.
+        Implementation of the Multi-Phase Prioritization Strategy (MPPS).
 
-        1. Anchors: Select lines with severity >= 80 (ERROR, CRITICAL).
-        2. Proximity: Add a 'context_window' around each anchor to capture stack traces.
-        3. Relevance: Fill the remaining 'max_output_lines' using a recency-weighted score.
+        This algorithm ensures that local LLMs receive the most semantically dense
+        information within their context window limit (max_output_lines).
+
+        Strategy:
+        1. Anchors: First, we identify "Ground Zero" lines—those with high severity
+           scores (>= 80). These are the definitive error messages.
+        2. Proximity: We expand the selection around each anchor by 'context_window' lines.
+           This captures the stack trace leading to the error, which is often more
+           valuable for the AI than the error message itself.
+        3. Recency-Weighted Relevance: If space remains, we fill it with other logs.
+           We use a hybrid score: Severity + (Index / Total) * 10. This ensures that
+           late-occurring warnings take precedence over early-occurring ones.
         """
         total_logs = len(logs)
         if total_logs == 0:
