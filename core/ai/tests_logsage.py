@@ -89,3 +89,36 @@ class TestLogSagePreprocessor(unittest.TestCase):
     def test_empty_logs(self):
         self.assertEqual(self.preprocessor.process(""), [])
         self.assertEqual(self.preprocessor.process("\n\n  \n"), [])
+        # Directly test _prioritize_logs for coverage of empty list check
+        self.assertEqual(self.preprocessor._prioritize_logs([]), [])
+
+    def test_quota_limits_in_context_window(self):
+        # Test max_output_lines limit in _add_context_window
+        self.preprocessor = LogSagePreprocessor(max_output_lines=2, context_window=1)
+        logs = """
+        ERROR: error 1
+        INFO: context for 1
+        ERROR: error 2
+        """
+        processed = self.preprocessor.process(logs)
+        # error 1 and error 2 should be added as anchors first.
+        # Then context for 1 would be added but max_output_lines=2 is already reached.
+        self.assertEqual(len(processed), 2)
+        self.assertIn("ERROR: error 1", processed)
+        self.assertIn("ERROR: error 2", processed)
+        self.assertNotIn("INFO: context for 1", processed)
+
+    def test_fill_remaining_quota(self):
+        # Test _fill_remaining_quota with max_output_lines
+        self.preprocessor = LogSagePreprocessor(max_output_lines=2, context_window=0)
+        logs = """
+        INFO: log 1
+        INFO: log 2
+        INFO: log 3
+        """
+        processed = self.preprocessor.process(logs)
+        self.assertEqual(len(processed), 2)
+        # Should fill with logs by priority (recency boosts them slightly)
+        # log 3 and log 2 should be more recent
+        self.assertIn("INFO: log 3", processed)
+        self.assertIn("INFO: log 2", processed)

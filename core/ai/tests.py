@@ -187,6 +187,29 @@ class TestOllamaClient(unittest.TestCase):
             }
         )
 
+    @patch("requests.post")
+    def test_session_context_manager(self, mock_post):
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"status": "success"}
+        mock_response.status_code = 200
+        mock_post.return_value = mock_response
+
+        with self.client.session(model="llama3") as client:
+            self.assertEqual(client, self.client)
+
+        mock_post.assert_called_once_with(
+            "http://ollama-test:11434/api/generate",
+            json={"model": "llama3", "keep_alive": 0}
+        )
+
+    @patch("requests.post")
+    def test_session_context_manager_exception(self, mock_post):
+        mock_post.side_effect = Exception("Ollama down")
+
+        # Should not raise exception from finally block
+        with self.client.session(model="llama3") as client:
+            pass
+
 class TestExecutor(unittest.TestCase):
     def setUp(self):
         self.test_dir = Path(tempfile.mkdtemp())
@@ -278,3 +301,61 @@ class TestExecutor(unittest.TestCase):
         }
         with self.assertRaises(PermissionError):
             apply_fix(fix_data, root_dir=self.test_dir)
+
+    def test_apply_fix_delete_non_existent(self):
+        fix_data = {
+            "changes": [
+                {
+                    "file_path": "non_existent.py",
+                    "action": "delete",
+                    "content": ""
+                }
+            ]
+        }
+        results = apply_fix(fix_data, root_dir=self.test_dir)
+        self.assertEqual(results, ["Skip delete: non_existent.py does not exist"])
+
+    def test_apply_fix_update_non_existent(self):
+        fix_data = {
+            "changes": [
+                {
+                    "file_path": "non_existent.py",
+                    "action": "update",
+                    "content": "new content"
+                }
+            ]
+        }
+        with self.assertRaises(FileNotFoundError):
+            apply_fix(fix_data, root_dir=self.test_dir)
+
+    def test_apply_fix_update_missing_search_block(self):
+        file_path = self.test_dir / "exists.py"
+        file_path.write_text("content")
+        fix_data = {
+            "changes": [
+                {
+                    "file_path": "exists.py",
+                    "action": "update",
+                    "search_block": "NOT_HERE",
+                    "content": "new content"
+                }
+            ]
+        }
+        with self.assertRaises(ValueError):
+            apply_fix(fix_data, root_dir=self.test_dir)
+
+    @patch("pathlib.Path.cwd")
+    def test_apply_fix_default_root_dir(self, mock_cwd):
+        mock_cwd.return_value = self.test_dir
+        fix_data = {
+            "changes": [
+                {
+                    "file_path": "default.py",
+                    "action": "create",
+                    "content": "default"
+                }
+            ]
+        }
+        results = apply_fix(fix_data)
+        self.assertEqual(results, ["Created default.py"])
+        self.assertTrue((self.test_dir / "default.py").exists())
