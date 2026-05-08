@@ -40,3 +40,12 @@ class WhiteLabelTests(TestCase):
         request = self.factory.get("/")
         context = white_label(request)
         self.assertIsNone(context["white_label_config"])
+
+    def test_str_representation(self):
+        self.assertEqual(str(self.config1), "Config 1")
+
+    def test_save_not_active(self):
+        config2 = WhiteLabelConfiguration.objects.create(name="Config 2", is_active=False)
+        self.config1.refresh_from_db()
+        self.assertTrue(self.config1.is_active)
+        self.assertFalse(config2.is_active)

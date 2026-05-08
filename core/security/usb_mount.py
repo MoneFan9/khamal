@@ -7,8 +7,10 @@ logger = logging.getLogger(__name__)
 
 class USBMountManager:
     """
-    Utility class to securely mount USB volumes.
-    Forces noexec, nosuid, and nodev options to prevent malware execution.
+    USBMountManager: Secure physical ingestion engine.
+
+    Khamal allows deploying code from physical USB drives. This class implements
+    strict security controls to prevent this "physical vector" from compromising the host.
     """
 
     @staticmethod
@@ -16,6 +18,8 @@ class USBMountManager:
         """
         Validates that the device and mount paths are secure.
         """
+        # --- Security Hardening Protocol ---
+        # 1. Path Normalization: Prevent traversal attacks (e.g., ../../etc/passwd)
         try:
             device_path = os.path.normpath(device_path)
             if not os.path.isabs(mount_point):
@@ -68,6 +72,9 @@ class USBMountManager:
                 logger.error(f"Failed to create mount point {normalized_mount}: {e}")
                 return False
 
+        # -o noexec: Blocks execution of binaries (essential against malware).
+        # -o nosuid: Prevents privilege escalation via setuid/setgid bits.
+        # -o nodev: Disables device files interpretation.
         mount_options = "noexec,nosuid,nodev"
 
         try:

@@ -3,8 +3,12 @@ from typing import List
 
 class LogSagePreprocessor:
     """
-    LogSage Preprocessor algorithm to filter noise and isolate critical errors
-    from raw container logs.
+    LogSage Preprocessor: The core intelligence for local crash analysis.
+
+    This preprocessor solves the "context window" problem for LLMs. Instead of sending
+    thousands of lines of logs to the local model (which is slow and memory-intensive),
+    LogSage identifies "anchors" (critical errors), includes their immediate context,
+    and fills the remaining quota with recent relevant logs.
     """
 
     # Common noise patterns in logs
@@ -88,8 +92,11 @@ class LogSagePreprocessor:
 
     def _prioritize_logs(self, logs: List[str]) -> List[str]:
         """
-        Prioritizes logs by severity with a recency bias to maintain context.
-        Also includes context_window around high-severity logs.
+        Implementation of the Multi-Phase Prioritization Strategy.
+
+        1. Anchors: Select lines with severity >= 80 (ERROR, CRITICAL).
+        2. Proximity: Add a 'context_window' around each anchor to capture stack traces.
+        3. Relevance: Fill the remaining 'max_output_lines' using a recency-weighted score.
         """
         total_logs = len(logs)
         if total_logs == 0:
