@@ -1,6 +1,6 @@
 import pytest
 import docker
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, PropertyMock
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from projects.models import Project, Deployment

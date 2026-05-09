@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Khamal{% endblock %}
+
+{% block header_title %}Vos Projets{% endblock %}
+
+{% block header_actions %}
+<button class="btn-primary">
+    <i class="fas fa-plus mr-2"></i> Nouveau Projet
+</button>
+{% endblock %}
+
+{% block content %}
+<div class="px-4 py-6 sm:px-0">
+    {% if projects %}
+        <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {% for project in projects %}
+            <div class="bg-white overflow-hidden shadow rounded-lg border border-gray-200 hover:shadow-md transition-shadow">
+                <div class="p-5">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center">
+                            <div class="flex-shrink-0 bg-indigo-500 rounded-md p-3">
+                                <i class="fas fa-cube text-white text-xl"></i>
+                            </div>
+                            <div class="ml-4">
+                                <h3 class="text-lg font-medium text-gray-900 truncate">{{ project.name }}</h3>
+                                <p class="text-sm text-gray-500">{{ project.domain }}</p>
+                            </div>
+                        </div>
+                        <div class="flex flex-col items-end">
+                            {% with last_deployment=project.deployments.first %}
+                                {% if last_deployment %}
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+                                    {% if last_deployment.status == 'RUNNING' %}bg-green-100 text-green-800
+                                    {% elif last_deployment.status == 'FAILED' %}bg-red-100 text-red-800
+                                    {% else %}bg-yellow-100 text-yellow-800{% endif %}">
+                                        {{ last_deployment.status }}
+                                    </span>
+                                {% else %}
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
+                                        Aucun déploiement
+                                    </span>
+                                {% endif %}
+                            {% endwith %}
+                        </div>
+                    </div>
+                    <div class="mt-4">
+                        <p class="text-sm text-gray-600 line-clamp-2">
+                            {{ project.description|default:"Aucune description." }}
+                        </p>
+                    </div>
+                </div>
+                <div class="bg-gray-50 px-5 py-3 border-t border-gray-200 flex justify-between items-center">
+                    <div class="text-xs text-gray-500">
+                        Mis à jour {{ project.updated_at|timesince }}
+                    </div>
+                    <div class="flex space-x-3">
+                        {% with last_deployment=project.deployments.first %}
+                            {% if last_deployment %}
+                                <a href="{% url 'deployment-logs' last_deployment.id %}" class="text-indigo-600 hover:text-indigo-900 text-sm font-medium">Logs</a>
+                            {% endif %}
+                        {% endwith %}
+                        <a href="#" class="text-gray-600 hover:text-gray-900 text-sm font-medium">Gérer</a>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="text-center py-12 bg-white rounded-lg border-2 border-dashed border-gray-300">
+            <i class="fas fa-rocket text-gray-400 text-5xl mb-4"></i>
+            <h3 class="mt-2 text-sm font-medium text-gray-900">Aucun projet</h3>
+            <p class="mt-1 text-sm text-gray-500">Commencez par créer votre premier projet pour déployer vos applications.</p>
+            <div class="mt-6">
+                <button class="btn-primary">
+                    <i class="fas fa-plus mr-2"></i> Créer un projet
+                </button>
+            </div>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

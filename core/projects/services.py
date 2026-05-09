@@ -49,6 +49,9 @@ def _get_traefik_config() -> tuple[list[str], dict]:
 def ensure_global_proxy():
     """
     Ensures the global Traefik proxy and its network exist.
+
+    Khamal uses a single shared Traefik instance to route traffic to multiple project containers.
+    This centralized approach simplifies SSL management and port mapping (80/443).
     """
     client = get_docker_client()
 
@@ -80,6 +83,36 @@ def ensure_global_proxy():
             command=command,
             labels={"khamal.managed": "true"}
         )
+
+def _get_traefik_config() -> tuple[list[str], dict]:
+    """
+    Returns the command and volumes for the global Traefik container.
+    """
+    command = [
+        "--providers.docker=true",
+        "--providers.docker.exposedbydefault=false",
+        f"--providers.docker.network={PROXY_NETWORK_NAME}",
+        "--entrypoints.web.address=:80",
+        "--entrypoints.websecure.address=:443",
+    ]
+
+    volumes = {
+        '/var/run/docker.sock': {'bind': '/var/run/docker.sock', 'mode': 'ro'}
+    }
+
+    if settings.KHAMAL_SSL_ENABLED:
+        command.extend([
+            "--certificatesresolvers.le.acme.email=" + settings.KHAMAL_ACME_EMAIL,
+            "--certificatesresolvers.le.acme.storage=" + settings.KHAMAL_ACME_STORAGE,
+            "--certificatesresolvers.le.acme.tlschallenge=true",
+            "--certificatesresolvers.le.acme.caserver=" + settings.KHAMAL_ACME_CA_SERVER,
+            "--entrypoints.web.http.redirections.entryPoint.to=websecure",
+            "--entrypoints.web.http.redirections.entryPoint.scheme=https",
+        ])
+        # Persist certificates
+        volumes['khamal-letsencrypt'] = {'bind': '/letsencrypt', 'mode': 'rw'}
+
+    return command, volumes
 
 def ensure_project_network(project: Project) -> str:
     """
@@ -288,6 +321,11 @@ def _get_deployment_volumes(deployment: Deployment) -> dict:
 def create_deployment_container(deployment: Deployment, image: str):
     """
     Creates and starts a container for the deployment with proper networks and labels.
+
+    Architectural Note:
+    Each deployment is connected to two networks:
+    1. A private project network (for communication with project-specific DBs).
+    2. The global proxy network (for external access via Traefik).
     """
     client = get_docker_client()
     project = deployment.project
@@ -304,7 +342,7 @@ def create_deployment_container(deployment: Deployment, image: str):
         deployment.status = Deployment.Status.STARTING
         deployment.save(update_fields=['status'])
 
-        # Prepare volumes
+        # Prepare volumes (e.g., for Hot-Reload)
         volumes = _get_deployment_volumes(deployment)
 
         network_obj = client.networks.get(project_network_id)

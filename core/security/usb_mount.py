@@ -7,8 +7,10 @@ logger = logging.getLogger(__name__)
 
 class USBMountManager:
     """
-    Utility class to securely mount USB volumes.
-    Forces noexec, nosuid, and nodev options to prevent malware execution.
+    USBMountManager: Secure physical ingestion engine.
+
+    Khamal allows deploying code from physical USB drives. This class implements
+    strict security controls to prevent this "physical vector" from compromising the host.
     """
 
     @staticmethod

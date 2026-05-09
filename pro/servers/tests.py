@@ -46,3 +46,7 @@ class ServerAPITestCase(TestCase):
         invalid_data["ssh_port"] = 70000
         response = self.client.post("/api/servers/", invalid_data, format="json")
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_str_representation(self):
+        server = Server.objects.create(**self.server_data)
+        self.assertEqual(str(server), "Production Node 1 (192.168.1.100)")
