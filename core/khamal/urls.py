@@ -1,12 +1,16 @@
+import os
 from .views import home
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import path, include
 
+# Get hidden admin URL from environment, default to 'admin'
+ADMIN_URL = os.environ.get('ADMIN_URL', 'admin')
+
 urlpatterns = [
     path("api/projects/", include("projects.urls")),
-    path("admin/", admin.site.urls),
+    path(f"{ADMIN_URL}/", admin.site.urls),
     path("", home, name="home"),
 ]
 
