@@ -1,5 +1,6 @@
 import requests
 from django.conf import settings
+from contextlib import contextmanager
 
 class OllamaClient:
     def __init__(self, base_url=None):
@@ -92,3 +93,17 @@ class OllamaClient:
         response = requests.post(f"{self.api_url}/generate", json=payload)
         response.raise_for_status()
         return response.json()
+
+    @contextmanager
+    def session(self, model):
+        """
+        Context manager to ensure the model is unloaded from memory
+        after the request is completed.
+        """
+        try:
+            yield self
+        finally:
+            try:
+                self.unload_model(model)
+            except Exception:
+                pass
