@@ -318,11 +318,8 @@ def create_deployment_container(deployment: Deployment, image: str):
         volumes = _get_deployment_volumes(deployment)
 
         network_obj = client.networks.get(project_network_id)
-
-        # SECURITY: Least Privilege Enforcement
-        # 1. We use a dedicated, isolated bridge network for each project.
-        # 2. Privileged mode and capability additions are strictly forbidden.
-        # 3. All Docker API calls are proxied through docker-socket-proxy.
+        # SECURITY: Never use privileged=True, cap_add, or other privilege escalation flags.
+        # Least privilege is enforced via the docker-socket-proxy and isolated networks.
         container = client.containers.run(
             image,
             detach=True,

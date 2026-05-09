@@ -25,8 +25,8 @@ class USBMountManager:
         Returns:
             bool: True if successful, False otherwise.
         """
-        # --- Security Hardening Protocol ---
-        # 1. Path Normalization: Prevent traversal attacks (e.g., ../../etc/passwd)
+        # --- Security Validation ---
+        # 1. Resolve and Normalize paths to prevent traversal and symlink bypasses
         try:
             device_path = os.path.normpath(device_path)
             # We don't use realpath on device_path as it might not exist yet or might be a symlink we want (like /dev/disk/by-id/...)
