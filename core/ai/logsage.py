@@ -74,14 +74,14 @@ class LogSagePreprocessor:
         """Phase 2: Add context window around high-severity logs."""
         for score, i in scored_indices:
             if len(selected_indices) >= self.max_output_lines:
-                return
+                break
             if score >= 80:
                 context = range(max(0, i - self.context_window), min(total_logs, i + self.context_window + 1))
                 for j in context:
                     if j not in selected_indices:
                         selected_indices.add(j)
                         if len(selected_indices) >= self.max_output_lines:
-                            return
+                            break
 
     def _fill_remaining_quota(self, scored_indices: List[tuple], selected_indices: set):
         """Phase 3: Fill remaining space with other logs by priority."""
