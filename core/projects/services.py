@@ -18,9 +18,9 @@ DATABASE_IMAGES = {
     "redis": "redis:7-alpine",
 }
 
-def _get_traefik_config() -> tuple[list[str], dict]:
+def _get_traefik_config() -> tuple[list[str], dict[str, dict]]:
     """
-    Builds the Traefik command and volumes configuration.
+    Returns the Traefik command-line arguments and volume mappings.
     """
     command = [
         "--providers.docker=true",
@@ -387,6 +387,7 @@ def _wait_for_healthy(container, timeout: int = 60):
         container.reload()
         # If the container has a health check, wait for it; otherwise, just wait for 'running' status
         health = container.attrs.get("State", {}).get("Health", {}).get("Status")
+        # If no health check, just wait for 'running' status
         if health == "healthy" or (health is None and container.status == "running"):
             return True
 

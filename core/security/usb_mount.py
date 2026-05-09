@@ -18,10 +18,8 @@ class USBMountManager:
     @staticmethod
     def _validate_paths(device_path, mount_point):
         """
-        Validates that the device and mount paths are secure.
+        Validates device and mount paths for security.
         """
-        # --- Security Hardening Protocol ---
-        # 1. Path Normalization: Prevent traversal attacks (e.g., ../../etc/passwd)
         try:
             # 1. Basic normalization
             device_path = os.path.normpath(device_path)
@@ -34,12 +32,10 @@ class USBMountManager:
             logger.error(f"Path normalization error: {e}")
             return None, None
 
-        # Validate device path (must be in /dev/)
         if os.path.commonpath(["/dev", device_path]) != "/dev":
             logger.error(f"Invalid device path (must be in /dev): {device_path}")
             return None, None
 
-        # Validate mount point (must be strictly within /mnt/usb/)
         allowed_mount_base = os.path.normpath("/mnt/usb")
         try:
             if os.path.commonpath([allowed_mount_base, normalized_mount]) != allowed_mount_base:
@@ -60,20 +56,10 @@ class USBMountManager:
         """
         Mounts a USB device to a specific mount point with security flags.
         """
-        device_path, normalized_mount = USBMountManager._validate_paths(device_path, mount_point)
-        if not device_path:
+        device_path, mount_point = USBMountManager._validate_paths(device_path, mount_point)
+        if not device_path or not mount_point:
             return False
 
-        # 4. Validate that device_path is a block device
-        try:
-            if not Path(device_path).is_block_device():
-                logger.error(f"Device path is not a block device: {device_path}")
-                return False
-        except Exception as e:
-            logger.error(f"Error validating block device {device_path}: {e}")
-            return False
-
-        # 5. Integrate with USBGuard: Ensure USBGuard is installed and service is active
         if not USBGuardManager.is_installed():
             logger.error("USBGuard is not installed. Refusing to mount for security reasons.")
             return False
