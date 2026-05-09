@@ -142,7 +142,7 @@ AUTH_USER_MODEL = 'accounts.User'
 
 # Docker Configuration
 # Using docker-socket-proxy for least privilege access
-DOCKER_URL = env("DOCKER_URL", default="tcp://docker-socket-proxy:2375")
+DOCKER_URL = env("DOCKER_URL", default="tcp://127.0.0.1:2375")
 
 # Domain Configuration
 KHAMAL_DEFAULT_DOMAIN_SUFFIX = env("KHAMAL_DEFAULT_DOMAIN_SUFFIX", default="khamal.local")
