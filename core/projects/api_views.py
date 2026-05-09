@@ -1,12 +1,14 @@
 from rest_framework import generics, permissions
-from .models import Project
-from .serializers import ProjectSerializer
+from .models import Project, Deployment
+from .serializers import ProjectSerializer, DeploymentSerializer
 
 class ProjectListCreateAPIView(generics.ListCreateAPIView):
     """
     API view to list and create projects.
     """
-    queryset = Project.objects.all()
+    queryset = Project.objects.select_related('owner').only(
+        'name', 'owner__username', 'created_at', 'updated_at', 'domain'
+    )
     serializer_class = ProjectSerializer
     permission_classes = [permissions.IsAuthenticated]
 
@@ -14,14 +16,13 @@ class ProjectListCreateAPIView(generics.ListCreateAPIView):
         # Automatically set the owner to the current user
         serializer.save(owner=self.request.user)
 
-from .models import Deployment
-from .serializers import DeploymentSerializer
-
 class DeploymentListCreateAPIView(generics.ListCreateAPIView):
     """
     API view to list and create deployments.
     """
-    queryset = Deployment.objects.all()
+    queryset = Deployment.objects.select_related('project').only(
+        'project__name', 'status', 'container_id', 'container_port', 'hot_reload', 'created_at', 'updated_at'
+    )
     serializer_class = DeploymentSerializer
     permission_classes = [permissions.IsAuthenticated]
 

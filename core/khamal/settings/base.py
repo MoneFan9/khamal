@@ -31,7 +31,7 @@ ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=[])
 
 INSTALLED_APPS = [
     "daphne",
-"django.contrib.admin",
+    "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
@@ -45,10 +45,15 @@ INSTALLED_APPS = [
     "ai",
     "rest_framework",
     "channels",
-    "pro.white_label",
-    "pro.servers",
-    "pro.ai_support",
 ]
+
+# Add Pro apps if available (Open-Core architecture)
+if (BASE_DIR.parent / "pro").exists():
+    INSTALLED_APPS += [
+        "pro.white_label",
+        "pro.servers",
+        "pro.ai_support",
+    ]
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
