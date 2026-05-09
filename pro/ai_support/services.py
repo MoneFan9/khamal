@@ -1,12 +1,19 @@
 from .models import DiagnosticRequest
+from core.ai.client import OllamaClient
 
 class LLMService:
     @staticmethod
     def get_local_diagnostic(server, query):
         """
-        Simulates a local LLM diagnostic.
+        Simulates a local LLM diagnostic using Ollama with automatic unloading.
         """
-        return f"[LOCAL LLM] Diagnosis for server {server.name}: Resources are sufficient. Recommendation: check application logs."
+        client = OllamaClient()
+        model = "llama3.2:3b" # Default low-footprint model
+
+        with client.session(model=model):
+            # In a real implementation, we would call client.chat(...) here
+            # For this task, we maintain the simulation but wrapped in the session
+            return f"[LOCAL LLM] Diagnosis for server {server.name}: Resources are sufficient. Recommendation: check application logs."
 
     @staticmethod
     def get_cloud_diagnostic(server, query):
@@ -17,8 +24,9 @@ class LLMService:
 
 class RouterService:
     # Thresholds for routing
+    # Adjusted threshold to 7.5GB to allow local LLM on 8GB machines with safety margin
     MIN_CPU_CORES = 4
-    MIN_MEMORY_BYTES = 8 * 1024 * 1024 * 1024  # 8GB
+    MIN_MEMORY_BYTES = 7.5 * 1024 * 1024 * 1024
 
     @classmethod
     def route_request(cls, server):

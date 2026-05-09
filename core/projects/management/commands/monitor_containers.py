@@ -1,5 +1,6 @@
 import time
 import sys
+from django.db import reset_queries
 from django.core.management.base import BaseCommand
 from projects.docker_client import get_docker_client
 from projects.models import Deployment
@@ -92,6 +93,8 @@ class Command(BaseCommand):
                     except Exception as e:
                         self.stdout.write(self.style.ERROR(f"Error getting stats for {dep.project.name}: {e}"))
 
+                # Clear Django query log to prevent memory leaks in DEBUG mode
+                reset_queries()
                 time.sleep(2)
         except KeyboardInterrupt:
             self.stdout.write(self.style.SUCCESS("\nMonitoring stopped."))
