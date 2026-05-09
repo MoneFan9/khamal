@@ -54,25 +54,44 @@ class GitManagerTest(TestCase):
         clone_repository(self.repository.id)
         mock_repo.clone_from.assert_not_called()
 
-    @patch('git_manager.services.git.Repo')
-    def test_pull_repository_failure(self, mock_repo):
-        mock_repo.side_effect = Exception("Pull failed")
-        with self.assertRaises(Exception):
-            pull_repository(self.repository.id)
-
     @patch('git_manager.services.git_executor')
     def test_pull_repository_async(self, mock_executor):
         pull_repository_async(self.repository.id)
         mock_executor.submit.assert_called_once_with(pull_repository, self.repository.id)
 
     @patch('git_manager.services.git.Repo')
-    def test_switch_branch_failure(self, mock_repo):
-        mock_repo.side_effect = Exception("Switch failed")
+    def test_clone_repository_failure(self, mock_repo):
+        mock_repo.clone_from.side_effect = Exception("Clone failed")
         with self.assertRaises(Exception):
-            switch_branch(self.repository.id, "non-existent")
+            clone_repository(self.repository.id)
 
     @patch('git_manager.services.git.Repo')
-    def test_list_branches_failure(self, mock_repo):
+    def test_pull_repository_exception(self, mock_repo):
+        # Trigger exception inside pull_repository
+        mock_repo.side_effect = Exception("Pull failed")
+        with self.assertRaises(Exception):
+            pull_repository(self.repository.id)
+
+    @patch('git_manager.services.git.Repo')
+    def test_switch_branch_exception(self, mock_repo):
+        # Trigger exception inside switch_branch after repo initialization
+        mock_instance = mock_repo.return_value
+        mock_instance.remotes.origin.fetch.side_effect = Exception("Fetch failed")
+        with self.assertRaises(Exception):
+            switch_branch(self.repository.id, "new-branch")
+
+    @patch('git_manager.services.git.Repo')
+    def test_switch_branch_success(self, mock_repo):
+        mock_instance = mock_repo.return_value
+        switch_branch(self.repository.id, "develop")
+        mock_instance.remotes.origin.fetch.assert_called_once()
+        mock_instance.git.checkout.assert_called_once_with("develop")
+        self.repository.refresh_from_db()
+        self.assertEqual(self.repository.current_branch, "develop")
+
+    @patch('git_manager.services.git.Repo')
+    def test_list_branches_exception(self, mock_repo):
+        # Trigger exception inside list_branches
         mock_repo.side_effect = Exception("List failed")
         with self.assertRaises(Exception):
             list_branches(self.repository.id)
