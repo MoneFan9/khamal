@@ -3,8 +3,12 @@ from typing import List
 
 class LogSagePreprocessor:
     """
-    LogSage Preprocessor algorithm to filter noise and isolate critical errors
-    from raw container logs.
+    LogSage Preprocessor: The core intelligence for local crash analysis.
+
+    This preprocessor solves the "context window" problem for LLMs. Instead of sending
+    thousands of lines of logs to the local model (which is slow and memory-intensive),
+    LogSage identifies "anchors" (critical errors), includes their immediate context,
+    and fills the remaining quota with recent relevant logs.
     """
 
     # Common noise patterns in logs
@@ -68,17 +72,16 @@ class LogSagePreprocessor:
 
     def _add_context_window(self, scored_indices: List[tuple], selected_indices: set, total_logs: int):
         """Phase 2: Add context window around high-severity logs."""
-        if len(selected_indices) < self.max_output_lines:
-            for score, i in scored_indices:
-                if score >= 80:
-                    context = range(max(0, i - self.context_window), min(total_logs, i + self.context_window + 1))
-                    for j in context:
-                        if j not in selected_indices:
-                            selected_indices.add(j)
-                            if len(selected_indices) >= self.max_output_lines:
-                                return
-                if len(selected_indices) >= self.max_output_lines:
-                    return
+        for score, i in scored_indices:
+            if len(selected_indices) >= self.max_output_lines or score < 80:
+                break
+
+            context = range(max(0, i - self.context_window), min(total_logs, i + self.context_window + 1))
+            for j in context:
+                if j not in selected_indices:
+                    selected_indices.add(j)
+                    if len(selected_indices) >= self.max_output_lines:
+                        return
 
     def _fill_remaining_quota(self, scored_indices: List[tuple], selected_indices: set):
         """Phase 3: Fill remaining space with other logs by priority."""
