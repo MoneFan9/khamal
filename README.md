@@ -4,12 +4,25 @@
 
 Khamal est un orchestrateur intelligent de déploiement (Self-Hosted PaaS) conçu pour transformer n'importe quelle machine physique ou VPS en une infrastructure de production complète. À l'intersection de l'orchestration Docker, de la détection de build automatique et de l'intelligence artificielle locale, Khamal élimine la friction entre le code et la mise en ligne, tout en garantissant une souveraineté totale des données.
 
+## 🚀 Installation "Plug & Play"
+
+Khamal est conçu pour être opérationnel en quelques secondes.
+
+```bash
+# Clonez le dépôt
+git clone https://github.com/your-repo/khamal.git
+cd khamal
+
+# Lancez l'installation automatique
+bash scripts/install.sh
+```
+
 ## 📂 Structure du Projet
 
-Le projet est divisé en deux parties distinctes :
+Le projet suit une architecture **Open-Core** :
 
-- **[/core](./core) :** Contient le cœur open-source de Khamal. Sous licence **Apache 2.0**.
-- **[/pro](./pro) :** Contient les extensions et fonctionnalités commerciales. Sous **licence propriétaire**.
+- **[/core](./core) :** Le cœur open-source. Gestion des déploiements, orchestration Docker, Nixpacks, et LogSage. Sous licence **Apache 2.0**.
+- **[/pro](./pro) :** Extensions commerciales. Multi-nœuds, Marque Blanche, Support IA avancé. Sous **licence propriétaire**.
 
 ## 🎯 Vision du Projet
 Contrairement aux solutions cloud propriétaires, Khamal rapatrie le pouvoir sur le matériel de l'utilisateur :
@@ -17,21 +30,30 @@ Contrairement aux solutions cloud propriétaires, Khamal rapatrie le pouvoir sur
 - **Zéro-Configuration :** S'appuie sur Nixpacks pour analyser le code source et générer des images OCI hautement optimisées sans nécessiter de `Dockerfile`.
 - **Ancrage Physique :** Permet le déploiement depuis des dépôts Git, mais aussi via des montages de dossiers locaux (Hot-Reload) et l'ingestion sécurisée depuis des supports USB.
 
-## 🏗️ Architecture Technique (Contexte pour les contributeurs & Agents IA)
+## 🏗️ Architecture Technique (Contexte pour les contributeurs)
 
-La pile technologique de Khamal est délibérément modulaire, orchestrée par un backend robuste :
+La pile technologique de Khamal est délibérément modulaire :
 
-- **Backend & API :** Python / Django. Gère la logique métier, les modèles de données (Projets, Déploiements, Serveurs) et l'interface d'administration.
-- **Orchestrateur :** Docker Engine piloté via le `docker-py` (Docker SDK for Python). Les appels sont contraints par le principe du moindre privilège via un proxy socket.
-- **Moteur de Build :** Nixpacks. Gère la détection des langages, la mise en cache agressive et le provisionnement implicite de bases de données associées (PostgreSQL, Redis).
-- **Routage & SSL :** Traefik (ou Caddy). Attachement dynamique des labels pour les noms de domaine et génération automatique des certificats Let's Encrypt.
-- **Moteur d'IA :** Ollama. Exécute des modèles quantifiés (Llama 3.2 3B ou Qwen 2.5 Coder 3B) pour l'analyse causale (RCA) des erreurs de build et d'exécution.
+- **Backend :** Python 3.12+ / Django 6.0.
+- **Orchestrateur :** Docker Engine via Docker SDK. Sécurisé par `docker-socket-proxy`.
+- **Moteur de Build :** Nixpacks (Génère des images sans Dockerfile).
+- **Routage :** Traefik avec SSL automatique (Let's Encrypt).
+- **IA Locale :** Ollama (Llama 3.2, Qwen 2.5 Coder).
 
-## 🚀 Modèle Open-Core
-Khamal est propulsé par la communauté sous licence Apache 2.0. Des fonctionnalités étendues, telles que le pilotage Multi-Nœuds centralisé et la personnalisation en Marque Blanche pour les agences, sont disponibles sous licence commerciale dans l'écosystème Pro.
+## 🤝 Contribuer
 
-## 🛠️ Installation (En cours de développement)
-*Les scripts d'installation curl automatisés seront bientôt disponibles.*
+Nous accueillons les contributions avec enthousiasme ! Pour commencer :
+
+1. **Explorez `/core`** : C'est là que réside toute la logique open-source.
+2. **Lisez les commentaires** : Le code est documenté pour expliquer non seulement *ce qu'il fait*, mais surtout *pourquoi* il le fait ainsi (sécurité, isolation).
+3. **Architecture Clean** : Respectez l'indépendance de `/core`. Le cœur ne doit jamais dépendre de `/pro`.
+
+### Tests
+Pour lancer la suite de tests :
+```bash
+export PYTHONPATH=core:.
+pytest
+```
 
 ## 📄 Licence
 Ce projet utilise un modèle dual-licensing :
