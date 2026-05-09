@@ -10,10 +10,16 @@
     <style type="text/tailwindcss">
         @layer components {
             .btn-primary {
-                @apply inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors;
+                @apply inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all duration-200 hover:scale-105 active:scale-95;
             }
             .pro-badge {
-                @apply inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-yellow-400 text-yellow-900 uppercase tracking-wider ml-1;
+                @apply inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-yellow-400 text-yellow-900 uppercase tracking-wider ml-1 shadow-sm;
+            }
+            .nav-link {
+                @apply border-transparent text-gray-500 hover:text-indigo-600 hover:border-indigo-300 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium transition-all duration-200;
+            }
+            .nav-link-active {
+                @apply border-indigo-500 text-gray-900 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium transition-all duration-200;
             }
         }
     </style>
@@ -44,14 +50,14 @@
                             </a>
                         </div>
                         <div class="hidden sm:-my-px sm:ml-8 sm:flex sm:space-x-8">
-                            <a href="/" class="border-indigo-500 text-gray-900 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium" aria-current="page">
+                            <a href="/" class="nav-link-active" aria-current="page">
                                 Dashboard
                             </a>
                             {% if is_pro_loaded %}
-                                <a href="/admin/pro_white_label/whitelabelconfiguration/" class="border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                                <a href="/admin/pro_white_label/whitelabelconfiguration/" class="nav-link">
                                     Marque Blanche <span class="pro-badge">PRO</span>
                                 </a>
-                                <a href="/api/servers/" class="border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                                <a href="/api/servers/" class="nav-link">
                                     Flotte <span class="pro-badge">PRO</span>
                                 </a>
                             {% endif %}
@@ -81,16 +87,22 @@
             </div>
 
             <!-- Mobile menu, show/hide based on menu state. -->
-            <div class="hidden sm:hidden" id="mobile-menu">
-                <div class="pt-2 pb-3 space-y-1">
-                    <a href="/" class="bg-indigo-50 border-indigo-500 text-indigo-700 block pl-3 pr-4 py-2 border-l-4 text-base font-medium" aria-current="page">Dashboard</a>
+            <div class="hidden sm:hidden bg-white border-b border-gray-200 shadow-xl rounded-b-2xl overflow-hidden transition-all duration-300 ease-in-out" id="mobile-menu">
+                <div class="pt-2 pb-3 space-y-1 px-2">
+                    <a href="/" class="bg-indigo-50 border-indigo-500 text-indigo-700 block pl-3 pr-4 py-3 border-l-4 text-base font-semibold rounded-r-lg transition-all duration-200" aria-current="page">
+                        <i class="fas fa-home mr-2"></i> Dashboard
+                    </a>
                     {% if is_pro_loaded %}
-                        <a href="/admin/pro_white_label/whitelabelconfiguration/" class="border-transparent text-gray-600 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-800 block pl-3 pr-4 py-2 border-l-4 text-base font-medium">Marque Blanche <span class="pro-badge">PRO</span></a>
-                        <a href="/api/servers/" class="border-transparent text-gray-600 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-800 block pl-3 pr-4 py-2 border-l-4 text-base font-medium">Flotte <span class="pro-badge">PRO</span></a>
+                        <a href="/admin/pro_white_label/whitelabelconfiguration/" class="border-transparent text-gray-600 hover:bg-gray-50 hover:border-indigo-300 hover:text-indigo-700 block pl-3 pr-4 py-3 border-l-4 text-base font-medium transition-all duration-200">
+                            <i class="fas fa-paint-brush mr-2"></i> Marque Blanche <span class="pro-badge">PRO</span>
+                        </a>
+                        <a href="/api/servers/" class="border-transparent text-gray-600 hover:bg-gray-50 hover:border-indigo-300 hover:text-indigo-700 block pl-3 pr-4 py-3 border-l-4 text-base font-medium transition-all duration-200">
+                            <i class="fas fa-server mr-2"></i> Flotte <span class="pro-badge">PRO</span>
+                        </a>
                     {% endif %}
                 </div>
-                <div class="pt-4 pb-3 border-t border-gray-200">
-                    <div class="flex items-center px-4">
+                <div class="pt-4 pb-3 border-t border-gray-100 bg-gray-50">
+                    <div class="flex items-center px-5">
                         <div class="flex-shrink-0">
                             <i class="fas fa-user-circle text-3xl text-gray-400"></i>
                         </div>
