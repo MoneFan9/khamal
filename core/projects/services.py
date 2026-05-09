@@ -20,7 +20,7 @@ DATABASE_IMAGES = {
 
 def _get_traefik_config() -> tuple[list[str], dict]:
     """
-    Builds the Traefik command and volumes configuration.
+    Helper to generate Traefik command and volumes.
     """
     command = [
         "--providers.docker=true",
@@ -29,17 +29,16 @@ def _get_traefik_config() -> tuple[list[str], dict]:
         "--entrypoints.web.address=:80",
         "--entrypoints.websecure.address=:443",
     ]
-
     volumes = {
         '/var/run/docker.sock': {'bind': '/var/run/docker.sock', 'mode': 'ro'}
     }
 
     if settings.KHAMAL_SSL_ENABLED:
         command.extend([
-            "--certificatesresolvers.le.acme.email=" + settings.KHAMAL_ACME_EMAIL,
-            "--certificatesresolvers.le.acme.storage=" + settings.KHAMAL_ACME_STORAGE,
+            f"--certificatesresolvers.le.acme.email={settings.KHAMAL_ACME_EMAIL}",
+            f"--certificatesresolvers.le.acme.storage={settings.KHAMAL_ACME_STORAGE}",
             "--certificatesresolvers.le.acme.tlschallenge=true",
-            "--certificatesresolvers.le.acme.caserver=" + settings.KHAMAL_ACME_CA_SERVER,
+            f"--certificatesresolvers.le.acme.caserver={settings.KHAMAL_ACME_CA_SERVER}",
             "--entrypoints.web.http.redirections.entryPoint.to=websecure",
             "--entrypoints.web.http.redirections.entryPoint.scheme=https",
         ])
@@ -72,9 +71,7 @@ def ensure_global_proxy():
         client.containers.get(TRAEFIK_CONTAINER_NAME)
     except docker.errors.NotFound:
         logger.info(f"Creating global Traefik container: {TRAEFIK_CONTAINER_NAME}")
-
         command, volumes = _get_traefik_config()
-
         client.containers.run(
             TRAEFIK_IMAGE,
             name=TRAEFIK_CONTAINER_NAME,
@@ -383,10 +380,9 @@ def _wait_for_healthy(container, timeout: int = 60):
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         container.reload()
-        # Wait for "healthy" (if health check exists) or "running" (otherwise)
-        health = container.attrs.get("State", {}).get("Health", {}).get("Status")
+        state = container.attrs.get("State", {})
+        health = state.get("Health", {}).get("Status")
 
-        # Return True if healthy OR (no health check AND running)
         if health == "healthy" or (health is None and container.status == "running"):
             return True
 
