@@ -47,9 +47,9 @@ def test_modern_ui_elements_present():
     html = render_to_string('base.html', context, request=request)
 
     assert 'transition-all' in html
-    assert 'duration-200' in html
+    assert 'duration-300' in html
     assert 'rounded-full' in html # Pour les badges pro
-    assert 'shadow-md' in html    # Pour les boutons
+    assert 'shadow-lg' in html    # Pour les boutons
 
 @pytest.mark.django_db
 def test_dashboard_modern_elements():
