@@ -60,6 +60,16 @@ class USBMountManager:
         if not device_path or not mount_point:
             return False
 
+        # 4. Validate that device_path is a block device
+        try:
+            if not Path(device_path).is_block_device():
+                logger.error(f"Device path is not a block device: {device_path}")
+                return False
+        except Exception as e:
+            logger.error(f"Error validating block device {device_path}: {e}")
+            return False
+
+        # 5. Integrate with USBGuard: Ensure USBGuard is installed and service is active
         if not USBGuardManager.is_installed():
             logger.error("USBGuard is not installed. Refusing to mount for security reasons.")
             return False
