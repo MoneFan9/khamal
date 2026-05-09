@@ -3,8 +3,12 @@ from typing import List
 
 class LogSagePreprocessor:
     """
-    LogSage Preprocessor algorithm to filter noise and isolate critical errors
-    from raw container logs.
+    LogSage Preprocessor: The core intelligence for local crash analysis.
+
+    This preprocessor solves the "context window" problem for LLMs. Instead of sending
+    thousands of lines of logs to the local model (which is slow and memory-intensive),
+    LogSage identifies "anchors" (critical errors), includes their immediate context,
+    and fills the remaining quota with recent relevant logs.
     """
 
     # Common noise patterns in logs
