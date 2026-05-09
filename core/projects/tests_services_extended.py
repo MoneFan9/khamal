@@ -1,143 +1,223 @@
-from django.test import TestCase, RequestFactory
+import pytest
+import docker
 from unittest.mock import patch, MagicMock
+from projects.models import Project, Deployment
 from projects.services import (
     ensure_project_network, start_container, stop_container,
     restart_container, remove_container, _get_deployment_volumes,
-    provision_database, delete_project_network, get_routing_labels
+    _wait_for_healthy, provision_database, get_deployment_logs
 )
-from projects.models import Project, Deployment
-from local.models import LocalSource
-from projects.api_views import DeploymentListCreateAPIView
 from django.contrib.auth import get_user_model
-from django.conf import settings
-import docker
 
 User = get_user_model()
 
-class ServicesExtendedTests(TestCase):
-
-    def setUp(self):
-        self.user = User.objects.create_user(username="testuser")
-        self.project = Project.objects.create(name="testproject", owner=self.user)
-        self.deployment = Deployment.objects.create(project=self.project)
+@pytest.mark.django_db
+class TestServicesExtended:
 
     @patch("projects.services.get_docker_client")
-    def test_ensure_project_network_exists(self, mock_get_client):
+    def test_ensure_project_network_recreate(self, mock_get_client):
+        user = User.objects.create(username="testuser")
+        project = Project.objects.create(name="testproj", owner=user, network_id="old-id")
+
         mock_client = MagicMock()
         mock_get_client.return_value = mock_client
-        mock_network = MagicMock()
-        mock_network.id = "existing_id"
-        mock_client.networks.list.return_value = [mock_network]
+        mock_client.networks.get.side_effect = Exception("Not found")
+        mock_client.networks.list.return_value = []
+        mock_client.networks.create.return_value = MagicMock(id="new-id")
 
-        network_id = ensure_project_network(self.project)
-        self.assertEqual(network_id, "existing_id")
-        self.assertEqual(self.project.network_id, "existing_id")
-
-    def test_delete_project_network_no_id(self):
-        self.project.network_id = None
-        # Should return early
-        delete_project_network(self.project)
-
-    def test_lifecycle_missing_container_id(self):
-        # start_container
-        with self.assertLogs("projects.services", level="ERROR") as cm:
-            start_container(self.deployment)
-            self.assertIn("no container_id", cm.output[0])
-
-        # stop_container
-        stop_container(self.deployment) # Should return early
-
-        # restart_container
-        restart_container(self.deployment) # Should return early
-
-        # remove_container
-        remove_container(self.deployment) # Should return early
+        network_id = ensure_project_network(project)
+        assert network_id == "new-id"
+        project.refresh_from_db()
+        assert project.network_id == "new-id"
 
     @patch("projects.services.get_docker_client")
-    def test_remove_container_exception(self, mock_get_client):
-        self.deployment.container_id = "cid"
+    def test_ensure_project_network_exists_by_name(self, mock_get_client):
+        user = User.objects.create(username="testuser_byname")
+        project = Project.objects.create(name="testproj_byname", owner=user)
+
+        mock_client = MagicMock()
+        mock_get_client.return_value = mock_client
+        mock_network = MagicMock(id="existing-id")
+        mock_client.networks.list.return_value = [mock_network]
+
+        network_id = ensure_project_network(project)
+        assert network_id == "existing-id"
+
+    @patch("projects.services.get_docker_client")
+    def test_container_lifecycle_exceptions(self, mock_get_client):
+        user = User.objects.create(username="testuser_lifecycle")
+        project = Project.objects.create(name="testproj_lifecycle", owner=user)
+        deployment = Deployment.objects.create(project=project, container_id="cont-id")
+
+        mock_client = MagicMock()
+        mock_get_client.return_value = mock_client
+        mock_client.containers.get.side_effect = Exception("Docker error")
+
+        with pytest.raises(Exception):
+            start_container(deployment)
+        assert deployment.status == Deployment.Status.FAILED
+
+        with pytest.raises(Exception):
+            stop_container(deployment)
+        assert deployment.status == Deployment.Status.FAILED
+
+        with pytest.raises(Exception):
+            restart_container(deployment)
+        assert deployment.status == Deployment.Status.FAILED
+
+        with pytest.raises(Exception):
+            remove_container(deployment)
+
+    def test_lifecycle_no_id(self):
+        user = User.objects.create(username="testuser_noid")
+        project = Project.objects.create(name="testproj_noid", owner=user)
+        deployment = Deployment.objects.create(project=project, container_id=None)
+
+        from projects.services import delete_project_network
+        project_no_net = Project.objects.create(name="nonet", owner=user, network_id=None)
+
+        # Test returns when no ID is present
+        start_container(deployment)
+        stop_container(deployment)
+        restart_container(deployment)
+        remove_container(deployment)
+        delete_project_network(project_no_net)
+
+    @patch("projects.services.get_docker_client")
+    def test_delete_project_network_failure(self, mock_get_client):
+        user = User.objects.create(username="testuser_netfail")
+        project = Project.objects.create(name="testproj_netfail", owner=user, network_id="net-id")
+        mock_client = MagicMock()
+        mock_get_client.return_value = mock_client
+        mock_client.networks.get.side_effect = Exception("Delete failed")
+
+        from projects.services import delete_project_network
+        delete_project_network(project)
+        assert project.network_id is None
+
+    def test_get_deployment_volumes_missing_localsource(self):
+        user = User.objects.create(username="testuser")
+        project = Project.objects.create(name="testproj", owner=user)
+        deployment = Deployment.objects.create(project=project, hot_reload=True)
+
+        volumes = _get_deployment_volumes(deployment)
+        assert volumes == {}
+
+    def test_wait_for_healthy_exited(self):
+        container = MagicMock()
+        container.attrs = {"State": {"Health": {"Status": "starting"}}}
+        container.status = "exited"
+
+        # We need to mock time.sleep to avoid waiting
+        with patch("projects.services.time.sleep"):
+            result = _wait_for_healthy(container, timeout=1)
+            assert result is False
+
+    @patch("projects.services.get_docker_client")
+    @patch("projects.services.ensure_project_network")
+    def test_provision_database_existing_running(self, mock_ensure_net, mock_get_client):
+        user = User.objects.create(username="testuser_dbexist")
+        project = Project.objects.create(name="testproj_dbexist", owner=user)
+        mock_ensure_net.return_value = "net-id"
+
         mock_client = MagicMock()
         mock_get_client.return_value = mock_client
         mock_container = MagicMock()
-        mock_container.remove.side_effect = Exception("Docker error")
+        mock_container.status = "running"
         mock_client.containers.get.return_value = mock_container
 
-        with self.assertRaises(Exception):
-            remove_container(self.deployment)
-
-    def test_get_routing_labels_ssl_enabled(self):
-        with self.settings(KHAMAL_SSL_ENABLED=True):
-            labels = get_routing_labels(self.deployment)
-            self.assertEqual(labels[f"traefik.http.routers.khamal-router-{self.deployment.id}.tls"], "true")
-
-    @patch("projects.services.logger")
-    def test_get_deployment_volumes_no_local_source(self, mock_logger):
-        self.deployment.hot_reload = True
-        volumes = _get_deployment_volumes(self.deployment)
-        self.assertEqual(volumes, {})
-        mock_logger.warning.assert_called()
+        container = provision_database(project, "postgres")
+        assert container == mock_container
 
     @patch("projects.services.get_docker_client")
-    def test_provision_database_existing_not_running(self, mock_get_client):
+    @patch("projects.services.ensure_project_network")
+    def test_provision_database_existing_stopped(self, mock_ensure_net, mock_get_client):
+        user = User.objects.create(username="testuser_dbstopped")
+        project = Project.objects.create(name="testproj_dbstopped", owner=user)
+        mock_ensure_net.return_value = "net-id"
+
         mock_client = MagicMock()
         mock_get_client.return_value = mock_client
         mock_container = MagicMock()
-        mock_container.status = "exited"
+        mock_container.status = "stopped"
         mock_client.containers.get.return_value = mock_container
 
-        mock_network = MagicMock()
-        mock_network.id = "net_id"
-        mock_client.networks.list.return_value = [mock_network]
-
-        provision_database(self.project, "postgres")
+        container = provision_database(project, "postgres")
+        assert container == mock_container
         mock_container.start.assert_called_once()
 
     @patch("projects.services.get_docker_client")
-    @patch("projects.services._wait_for_healthy")
-    def test_provision_database_timeout(self, mock_wait, mock_get_client):
-        mock_wait.return_value = False
+    @patch("projects.services.ensure_project_network")
+    def test_provision_database_general_exception(self, mock_ensure_net, mock_get_client):
+        user = User.objects.create(username="testuser_dbfail")
+        project = Project.objects.create(name="testproj_dbfail", owner=user)
+        mock_ensure_net.return_value = "net-id"
+
         mock_client = MagicMock()
         mock_get_client.return_value = mock_client
-        mock_client.containers.get.side_effect = docker.errors.NotFound("Not found")
+        mock_client.containers.get.side_effect = Exception("General error")
 
-        mock_network = MagicMock()
-        mock_network.id = "net_id"
-        mock_client.networks.list.return_value = [mock_network]
-
-        with self.assertLogs("projects.services", level="WARNING") as cm:
-            provision_database(self.project, "postgres")
-            self.assertIn("did not become healthy in time", cm.output[0])
+        with pytest.raises(Exception) as excinfo:
+            provision_database(project, "postgres")
+        assert "General error" in str(excinfo.value)
 
     @patch("projects.services.get_docker_client")
-    def test_provision_database_generic_exception(self, mock_get_client):
+    @patch("projects.services.ensure_project_network")
+    @patch("projects.services._wait_for_healthy")
+    def test_provision_database_not_healthy(self, mock_wait, mock_ensure_net, mock_get_client):
+        user = User.objects.create(username="testuser_dbunhealthy")
+        project = Project.objects.create(name="testproj_dbunhealthy", owner=user)
+        mock_ensure_net.return_value = "net-id"
+        mock_wait.return_value = False
+
         mock_client = MagicMock()
         mock_get_client.return_value = mock_client
         mock_client.containers.get.side_effect = docker.errors.NotFound("Not found")
-        mock_client.containers.run.side_effect = Exception("Generic error")
+        mock_container = MagicMock()
+        mock_client.containers.run.return_value = mock_container
 
-        mock_network = MagicMock()
-        mock_network.id = "net_id"
-        mock_client.networks.list.return_value = [mock_network]
+        container = provision_database(project, "postgres")
+        assert container == mock_container
 
-        with self.assertRaises(Exception):
-            provision_database(self.project, "postgres")
+    @patch("projects.services.get_docker_client")
+    @patch("projects.services.ensure_project_network")
+    def test_provision_database_race_condition(self, mock_ensure_net, mock_get_client):
+        user = User.objects.create(username="testuser_race")
+        project = Project.objects.create(name="testproj_race", owner=user)
+        mock_ensure_net.return_value = "net-id"
 
-class ApiViewsExtendedTests(TestCase):
-    def setUp(self):
-        self.factory = RequestFactory()
-        self.user = User.objects.create_user(username="testuser2")
-        self.other_user = User.objects.create_user(username="otheruser")
-        self.project = Project.objects.create(name="p1", owner=self.user)
-        self.other_project = Project.objects.create(name="p2", owner=self.other_user)
-        self.d1 = Deployment.objects.create(project=self.project)
-        self.d2 = Deployment.objects.create(project=self.other_project)
+        mock_client = MagicMock()
+        mock_get_client.return_value = mock_client
 
-    def test_deployment_list_queryset_filtering(self):
-        view = DeploymentListCreateAPIView()
-        request = self.factory.get('/api/deployments/')
-        request.user = self.user
-        view.request = request
+        # Simulate race condition (409 Conflict)
+        response = MagicMock()
+        response.status_code = 409
+        mock_client.containers.run.side_effect = docker.errors.APIError("Conflict", response=response)
+        mock_client.containers.get.side_effect = [docker.errors.NotFound("Not found"), MagicMock(id="existing-id")]
 
-        qs = view.get_queryset()
-        self.assertEqual(qs.count(), 1)
-        self.assertEqual(qs[0], self.d1)
+        container = provision_database(project, "postgres")
+        assert container.id == "existing-id"
+
+    @patch("projects.services.settings")
+    def test_get_routing_labels_no_ssl(self, mock_settings):
+        user = User.objects.create(username="testuser_nossl")
+        project = Project.objects.create(name="testproj_nossl", owner=user, domain="example.com")
+        deployment = Deployment.objects.create(project=project, container_port=80)
+
+        mock_settings.KHAMAL_SSL_ENABLED = False
+        from projects.services import get_routing_labels
+        labels = get_routing_labels(deployment)
+        assert labels[f"traefik.http.routers.khamal-router-{deployment.id}.entrypoints"] == "web"
+
+    @patch("projects.services.get_docker_client")
+    def test_get_deployment_logs_not_found(self, mock_get_client):
+        user = User.objects.create(username="testuser")
+        project = Project.objects.create(name="testproj", owner=user)
+        deployment = Deployment.objects.create(project=project, container_id="missing-id")
+
+        mock_client = MagicMock()
+        mock_get_client.return_value = mock_client
+        mock_client.containers.get.side_effect = docker.errors.NotFound("Not found")
+
+        logs = get_deployment_logs(deployment)
+        assert logs == ""

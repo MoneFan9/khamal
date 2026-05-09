@@ -1,33 +1,25 @@
-from django.test import TestCase
+import pytest
 from pro.white_label.models import WhiteLabelConfiguration
 
-class WhiteLabelExtendedTests(TestCase):
+@pytest.mark.django_db
+def test_white_label_singleton_active():
+    # Create first active config
+    config1 = WhiteLabelConfiguration.objects.create(name="Config 1", is_active=True)
+    assert config1.is_active is True
 
-    def test_white_label_singleton_active(self):
-        # Create first active config
-        config1 = WhiteLabelConfiguration.objects.create(name="Config 1", is_active=True)
-        self.assertTrue(config1.is_active)
+    # Create second active config, should deactivate first
+    config2 = WhiteLabelConfiguration.objects.create(name="Config 2", is_active=True)
+    config1.refresh_from_db()
+    assert config1.is_active is False
+    assert config2.is_active is True
 
-        # Create second active config
-        config2 = WhiteLabelConfiguration.objects.create(name="Config 2", is_active=True)
-        self.assertTrue(config2.is_active)
+    # Update first to be active again
+    config1.is_active = True
+    config1.save()
+    config2.refresh_from_db()
+    assert config1.is_active is True
+    assert config2.is_active is False
 
-        # Refresh config1 and check it's deactivated
-        config1.refresh_from_db()
-        self.assertFalse(config1.is_active)
-
-        # Create a third inactive config
-        config3 = WhiteLabelConfiguration.objects.create(name="Config 3", is_active=False)
-        self.assertFalse(config3.is_active)
-
-        # Activate config3
-        config3.is_active = True
-        config3.save()
-
-        config2.refresh_from_db()
-        self.assertFalse(config2.is_active)
-        self.assertTrue(config3.is_active)
-
-    def test_str_method(self):
-        config = WhiteLabelConfiguration(name="My Theme")
-        self.assertEqual(str(config), "My Theme")
+def test_white_label_str():
+    config = WhiteLabelConfiguration(name="My Config")
+    assert str(config) == "My Config"
