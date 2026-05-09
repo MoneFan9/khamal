@@ -73,15 +73,14 @@ class LogSagePreprocessor:
     def _add_context_window(self, scored_indices: List[tuple], selected_indices: set, total_logs: int):
         """Phase 2: Add context window around high-severity logs."""
         for score, i in scored_indices:
-            if score < 80 or len(selected_indices) >= self.max_output_lines:
+            if score < 80:
                 break
 
             context = range(max(0, i - self.context_window), min(total_logs, i + self.context_window + 1))
             for j in context:
-                if j not in selected_indices:
-                    selected_indices.add(j)
-                    if len(selected_indices) >= self.max_output_lines:
-                        return
+                if len(selected_indices) >= self.max_output_lines:
+                    return
+                selected_indices.add(j)
 
     def _fill_remaining_quota(self, scored_indices: List[tuple], selected_indices: set):
         """Phase 3: Fill remaining space with other logs by priority."""
@@ -133,13 +132,32 @@ class LogSagePreprocessor:
     def process(self, raw_logs: str) -> List[str]:
         """
         Main algorithm: filters noise, deduplicates, and prioritizes critical errors.
+        Uses generators for memory efficiency.
         """
         if not raw_logs:
             return []
 
-        lines = [line.strip() for line in raw_logs.splitlines() if line.strip()]
-        filtered = [line for line in lines if not self.is_noise(line)]
-        deduplicated = self.deduplicate(filtered)
+        # Use generator expressions to reduce memory overhead
+        lines = (line.strip() for line in raw_logs.splitlines() if line.strip())
+        filtered = (line for line in lines if not self.is_noise(line))
+
+        # Deduplicate using a generator-friendly approach
+        def gen_deduplicate(iterable):
+            prev = None
+            for item in iterable:
+                if item != prev:
+                    yield item
+                prev = item
+
+        deduplicated_gen = gen_deduplicate(filtered)
+
+        # Convert to list only when necessary for prioritization or if small enough
+        # We need a list for _prioritize_logs because it uses indices and multiple passes
+        deduplicated = []
+        for i, log in enumerate(deduplicated_gen):
+            deduplicated.append(log)
+            # If we are already under the limit and only have a few more, we might still want to list it
+            # But the logic below will handle it.
 
         if len(deduplicated) <= self.max_output_lines:
             return deduplicated

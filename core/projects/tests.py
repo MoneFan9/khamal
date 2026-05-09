@@ -169,3 +169,45 @@ class ProjectViewTest(TestCase):
         response = self.client.get(url)
         # Should redirect to login
         self.assertEqual(response.status_code, 302)
+
+class DeploymentAPITest(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="depuser", password="password")
+        self.other_user = User.objects.create_user(username="otherdepuser", password="password")
+        self.project = Project.objects.create(name="Project", owner=self.user)
+        self.other_project = Project.objects.create(name="Other Project", owner=self.other_user)
+        self.deployment = Deployment.objects.create(project=self.project)
+        self.other_deployment = Deployment.objects.create(project=self.other_project)
+        self.url = reverse('deployment-list-create')
+
+    def test_list_deployments_filtered_by_user(self):
+        self.client.force_authenticate(user=self.user)
+        response = self.client.get(self.url, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]['id'], self.deployment.id)
+
+    def test_list_deployments_other_user(self):
+        self.client.force_authenticate(user=self.other_user)
+        response = self.client.get(self.url, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]['id'], self.other_deployment.id)
+
+class LocalSourceSerializerTest(TestCase):
+    def test_validate_host_path_not_absolute(self):
+        from rest_framework import serializers
+        from .serializers import LocalSourceSerializer
+        serializer = LocalSourceSerializer()
+        with self.assertRaises(serializers.ValidationError) as cm:
+            serializer.validate_host_path("not/absolute")
+        self.assertIn("host_path must be an absolute path.", str(cm.exception))
+
+    def test_validate_host_path_denied(self):
+        from rest_framework import serializers
+        from .serializers import LocalSourceSerializer
+        serializer = LocalSourceSerializer()
+        with self.assertRaises(serializers.ValidationError) as cm:
+            # Assuming /etc is outside BASE_DIR
+            serializer.validate_host_path("/etc/passwd")
+        self.assertIn("denied", str(cm.exception))

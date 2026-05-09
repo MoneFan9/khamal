@@ -69,3 +69,6 @@ class TestRCAPromptBuilder(unittest.TestCase):
     def test_repr(self):
         self.assertIn("RCAPromptBuilder", repr(self.builder))
         self.assertIn("max_log_chars=12000", repr(self.builder))
+
+    def test_get_system_prompt(self):
+        self.assertEqual(self.builder.get_system_prompt(), self.builder.SYSTEM_PROMPT)
