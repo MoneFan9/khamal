@@ -1,6 +1,8 @@
 import subprocess
 import logging
 import os
+import re
+from pathlib import Path
 from .usb_guard import USBGuardManager
 
 logger = logging.getLogger(__name__)
@@ -62,11 +64,52 @@ class USBMountManager:
         if not device_path:
             return False
 
+        # 4. Validate that device_path is a block device
+        try:
+            if not Path(device_path).is_block_device():
+                logger.error(f"Device path is not a block device: {device_path}")
+                return False
+        except Exception as e:
+            logger.error(f"Error validating block device {device_path}: {e}")
+            return False
+
+        # 5. Integrate with USBGuard: Ensure USBGuard is installed and service is active
         if not USBGuardManager.is_installed():
             logger.error("USBGuard is not installed. Refusing to mount for security reasons.")
             return False
 
-        if not os.path.exists(normalized_mount):
+        if not USBGuardManager.is_service_active():
+            logger.error("USBGuard service is not active. Refusing to mount for security reasons.")
+            return False
+
+        # 6. Verify device authorization in USBGuard
+        # We ensure that the device (or its parent block device) is explicitly allowed by USBGuard.
+        devices = USBGuardManager.list_devices()
+        if devices is None:
+             logger.error("Failed to retrieve device list from USBGuard.")
+             return False
+
+        # Attempt to find an 'allow' rule for the device path or its parent
+        # (e.g., if device_path is /dev/sdb1, we also check for /dev/sdb)
+        parent_device = device_path.rstrip('0123456789')
+
+        authorized = False
+        # Use regex with word boundaries to avoid partial matches (e.g., /dev/sdb matching /dev/sdb1)
+        # and ensure 'allow' is present in the line.
+        # We use a negative lookahead to ensure the path is not just a prefix (e.g. /dev/sdb vs /dev/sdb1)
+        path_pattern = re.compile(rf"\ballow\b.*({re.escape(device_path)}|{re.escape(parent_device)})(?![\w/])")
+
+        logger.debug(f"Checking USBGuard authorization for {device_path} (parent: {parent_device})")
+        for line in devices.splitlines():
+            if path_pattern.search(line):
+                authorized = True
+                break
+
+        if not authorized:
+             logger.error(f"Device {device_path} is not authorized by USBGuard.")
+             return False
+
+        if not os.path.exists(mount_point):
             try:
                 os.makedirs(normalized_mount, exist_ok=True)
             except OSError as e:

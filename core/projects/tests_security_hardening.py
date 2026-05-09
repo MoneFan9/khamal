@@ -46,13 +46,19 @@ class SecurityHardeningTests(TestCase):
         self.assertFalse(serializer.is_valid())
         self.assertIn('host_path', serializer.errors)
 
+    @patch("security.usb_mount.Path.is_block_device")
+    @patch("security.usb_mount.USBGuardManager.list_devices")
+    @patch("security.usb_mount.USBGuardManager.is_service_active")
     @patch("security.usb_mount.USBGuardManager.is_installed")
     @patch("os.path.exists")
     @patch("os.makedirs")
     @patch("subprocess.run")
-    def test_usb_mount_valid(self, mock_run, mock_makedirs, mock_exists, mock_usbguard):
+    def test_usb_mount_valid(self, mock_run, mock_makedirs, mock_exists, mock_usbguard, mock_active, mock_list, mock_block):
         """Test USBMountManager with valid parameters and verify flags."""
         mock_usbguard.return_value = True
+        mock_active.return_value = True
+        mock_list.return_value = "allow /dev/sdb1"
+        mock_block.return_value = True
         mock_exists.return_value = False
         mock_run.return_value = MagicMock(returncode=0)
 
@@ -101,3 +107,32 @@ class SecurityHardeningTests(TestCase):
         mock_usbguard.return_value = False
         result = USBMountManager.mount_volume("/dev/sdb1", "/mnt/usb/my-stick")
         self.assertFalse(result)
+
+    @patch("security.usb_mount.USBGuardManager.is_service_active")
+    @patch("security.usb_mount.USBGuardManager.is_installed")
+    def test_usb_mount_inactive_service(self, mock_installed, mock_active):
+        """Test USBMountManager when USBGuard service is inactive."""
+        mock_installed.return_value = True
+        mock_active.return_value = False
+        result = USBMountManager.mount_volume("/dev/sdb1", "/mnt/usb/my-stick")
+        self.assertFalse(result)
+
+    @patch("projects.docker_client.docker.DockerClient")
+    def test_docker_privileged_blocked(self, mock_docker):
+        """Test that the hardened Docker client blocks privileged=True."""
+        from projects.docker_client import get_docker_client
+        client = get_docker_client()
+
+        with self.assertRaises(PermissionError) as cm:
+            client.containers.run("alpine", privileged=True)
+        self.assertIn("privileged", str(cm.exception))
+
+    @patch("projects.docker_client.docker.DockerClient")
+    def test_docker_cap_add_blocked(self, mock_docker):
+        """Test that the hardened Docker client blocks cap_add."""
+        from projects.docker_client import get_docker_client
+        client = get_docker_client()
+
+        with self.assertRaises(PermissionError) as cm:
+            client.containers.create("alpine", cap_add=["NET_ADMIN"])
+        self.assertIn("cap_add", str(cm.exception))
