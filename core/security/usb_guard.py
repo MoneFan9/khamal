@@ -18,6 +18,15 @@ class USBGuardManager:
             return False
 
     @staticmethod
+    def is_service_active():
+        """Checks if the usbguard service is active."""
+        try:
+            result = subprocess.run(["systemctl", "is-active", "usbguard"], capture_output=True, text=True)
+            return result.stdout.strip() == "active"
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            return False
+
+    @staticmethod
     def generate_policy():
         """Generates a policy that allows currently connected devices."""
         try:

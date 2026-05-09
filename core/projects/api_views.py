@@ -6,7 +6,9 @@ class ProjectListCreateAPIView(generics.ListCreateAPIView):
     """
     API view to list and create projects.
     """
-    queryset = Project.objects.all()
+    queryset = Project.objects.select_related('owner').only(
+        'name', 'owner__username', 'created_at', 'updated_at', 'domain'
+    )
     serializer_class = ProjectSerializer
     permission_classes = [permissions.IsAuthenticated]
 
@@ -18,7 +20,9 @@ class DeploymentListCreateAPIView(generics.ListCreateAPIView):
     """
     API view to list and create deployments.
     """
-    queryset = Deployment.objects.all()
+    queryset = Deployment.objects.select_related('project').only(
+        'project__name', 'status', 'container_id', 'container_port', 'hot_reload', 'created_at', 'updated_at'
+    )
     serializer_class = DeploymentSerializer
     permission_classes = [permissions.IsAuthenticated]
 
