@@ -123,13 +123,32 @@ class LogSagePreprocessor:
     def process(self, raw_logs: str) -> List[str]:
         """
         Main algorithm: filters noise, deduplicates, and prioritizes critical errors.
+        Uses generators for memory efficiency.
         """
         if not raw_logs:
             return []
 
-        lines = [line.strip() for line in raw_logs.splitlines() if line.strip()]
-        filtered = [line for line in lines if not self.is_noise(line)]
-        deduplicated = self.deduplicate(filtered)
+        # Use generator expressions to reduce memory overhead
+        lines = (line.strip() for line in raw_logs.splitlines() if line.strip())
+        filtered = (line for line in lines if not self.is_noise(line))
+
+        # Deduplicate using a generator-friendly approach
+        def gen_deduplicate(iterable):
+            prev = None
+            for item in iterable:
+                if item != prev:
+                    yield item
+                prev = item
+
+        deduplicated_gen = gen_deduplicate(filtered)
+
+        # Convert to list only when necessary for prioritization or if small enough
+        # We need a list for _prioritize_logs because it uses indices and multiple passes
+        deduplicated = []
+        for i, log in enumerate(deduplicated_gen):
+            deduplicated.append(log)
+            # If we are already under the limit and only have a few more, we might still want to list it
+            # But the logic below will handle it.
 
         if len(deduplicated) <= self.max_output_lines:
             return deduplicated
