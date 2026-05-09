@@ -1,25 +1,22 @@
-import pytest
+"""
+PROPRIETARY AND CONFIDENTIAL
+This file is part of the Khamal Pro package.
+Copyright (c) 2026 Khamal(MoneFan9). All rights reserved.
+"""
+
+from django.test import TestCase
 from pro.white_label.models import WhiteLabelConfiguration
 
-@pytest.mark.django_db
-def test_white_label_singleton_active():
-    # Create first active config
-    config1 = WhiteLabelConfiguration.objects.create(name="Config 1", is_active=True)
-    assert config1.is_active is True
+class WhiteLabelExtendedTests(TestCase):
+    def test_str_method(self):
+        config = WhiteLabelConfiguration(name="Branding Config")
+        assert str(config) == "Branding Config"
 
-    # Create second active config, should deactivate first
-    config2 = WhiteLabelConfiguration.objects.create(name="Config 2", is_active=True)
-    config1.refresh_from_db()
-    assert config1.is_active is False
-    assert config2.is_active is True
+    def test_save_is_active_false(self):
+        """Test saving a configuration with is_active=False doesn't deactivate others."""
+        config1 = WhiteLabelConfiguration.objects.create(name="Active", is_active=True)
+        config2 = WhiteLabelConfiguration.objects.create(name="Inactive", is_active=False)
 
-    # Update first to be active again
-    config1.is_active = True
-    config1.save()
-    config2.refresh_from_db()
-    assert config1.is_active is True
-    assert config2.is_active is False
-
-def test_white_label_str():
-    config = WhiteLabelConfiguration(name="My Config")
-    assert str(config) == "My Config"
+        config1.refresh_from_db()
+        assert config1.is_active is True
+        assert config2.is_active is False

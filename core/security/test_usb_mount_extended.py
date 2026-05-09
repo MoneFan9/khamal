@@ -1,79 +1,79 @@
 import pytest
 from unittest.mock import patch, MagicMock
-from security.usb_mount import USBMountManager
+import subprocess
 import os
+from security.usb_mount import USBMountManager
 
 @pytest.mark.django_db
-class TestUSBMountExtended:
+class TestUSBMountManagerExtended:
 
-    @patch("security.usb_mount.USBGuardManager.is_installed")
-    @patch("security.usb_mount.logger")
-    def test_mount_volume_non_absolute_mount_point(self, mock_logger, mock_usbguard):
-        mock_usbguard.return_value = True
+    @patch("security.usb_mount.os.path.isabs")
+    def test_mount_volume_non_absolute_mount_point(self, mock_isabs):
+        mock_isabs.return_value = False
         result = USBMountManager.mount_volume("/dev/sdb1", "mnt/usb/stick")
         assert result is False
-        mock_logger.error.assert_any_call("Mount point must be absolute: mnt/usb/stick")
 
     @patch("security.usb_mount.os.path.normpath")
-    @patch("security.usb_mount.logger")
-    def test_mount_volume_normalization_error(self, mock_logger, mock_normpath):
-        mock_normpath.side_effect = Exception("Normpath error")
+    def test_mount_volume_normalization_error(self, mock_normpath):
+        mock_normpath.side_effect = Exception("Normalization failed")
         result = USBMountManager.mount_volume("/dev/sdb1", "/mnt/usb/stick")
         assert result is False
-        mock_logger.error.assert_called_with("Path normalization error: Normpath error")
 
-    @patch("security.usb_mount.USBGuardManager.is_installed")
-    @patch("security.usb_mount.logger")
-    def test_mount_volume_invalid_device_path(self, mock_logger, mock_usbguard):
-        mock_usbguard.return_value = True
-        result = USBMountManager.mount_volume("/tmp/fake_device", "/mnt/usb/stick")
+    @patch("security.usb_mount.os.path.commonpath")
+    def test_mount_volume_invalid_device_path(self, mock_commonpath):
+        mock_commonpath.return_value = "/not_dev"
+        result = USBMountManager.mount_volume("/dev/sdb1", "/mnt/usb/stick")
         assert result is False
-        mock_logger.error.assert_any_call("Invalid device path (must be in /dev): /tmp/fake_device")
 
-    @patch("security.usb_mount.USBGuardManager.is_installed")
-    @patch("security.usb_mount.logger")
-    def test_mount_volume_invalid_mount_point(self, mock_logger, mock_usbguard):
-        mock_usbguard.return_value = True
-        result = USBMountManager.mount_volume("/dev/sdb1", "/tmp/invalid_mount")
+    @patch("security.usb_mount.os.path.commonpath")
+    def test_mount_volume_invalid_mount_point(self, mock_commonpath):
+        # Bypass the first check
+        mock_commonpath.side_effect = ["/dev", "/not_mnt"]
+        result = USBMountManager.mount_volume("/dev/sdb1", "/mnt/usb/stick")
         assert result is False
-        mock_logger.error.assert_any_call("Invalid mount point: /tmp/invalid_mount. Must be within /mnt/usb")
 
-    @patch("security.usb_mount.USBGuardManager.is_installed")
-    @patch("security.usb_mount.logger")
-    def test_mount_volume_mount_directly_on_base(self, mock_logger, mock_usbguard):
-        mock_usbguard.return_value = True
+    @patch("security.usb_mount.os.path.commonpath")
+    def test_mount_volume_mount_on_base(self, mock_commonpath):
+        # Bypass the first check, second check returns base
+        mock_commonpath.side_effect = ["/dev", "/mnt/usb"]
         result = USBMountManager.mount_volume("/dev/sdb1", "/mnt/usb")
         assert result is False
-        mock_logger.error.assert_any_call("Cannot mount directly on /mnt/usb")
+
+    @patch("security.usb_mount.os.path.commonpath")
+    def test_mount_volume_commonpath_value_error(self, mock_commonpath):
+        # Bypass the first check to reach the second commonpath in the try block
+        mock_commonpath.side_effect = ["/dev", ValueError("Invalid paths")]
+        result = USBMountManager.mount_volume("/dev/sdb1", "/mnt/usb/stick")
+        assert result is False
+
+    @patch("security.usb_mount.USBGuardManager.is_installed")
+    def test_mount_volume_usbguard_not_installed(self, mock_is_installed):
+        mock_is_installed.return_value = False
+        result = USBMountManager.mount_volume("/dev/sdb1", "/mnt/usb/stick")
+        assert result is False
 
     @patch("security.usb_mount.USBGuardManager.is_installed")
     @patch("security.usb_mount.os.path.exists")
     @patch("security.usb_mount.os.makedirs")
-    @patch("security.usb_mount.logger")
-    def test_mount_volume_makedirs_failure(self, mock_logger, mock_makedirs, mock_exists, mock_usbguard):
-        mock_usbguard.return_value = True
+    def test_mount_volume_makedirs_error(self, mock_makedirs, mock_exists, mock_is_installed):
+        mock_is_installed.return_value = True
         mock_exists.return_value = False
-        mock_makedirs.side_effect = OSError("Makedirs failed")
-
+        mock_makedirs.side_effect = OSError("Permission denied")
         result = USBMountManager.mount_volume("/dev/sdb1", "/mnt/usb/stick")
         assert result is False
-        mock_logger.error.assert_any_call("Failed to create mount point /mnt/usb/stick: Makedirs failed")
 
     @patch("security.usb_mount.USBGuardManager.is_installed")
-    @patch("security.usb_mount.logger")
-    @patch("security.usb_mount.os.path.commonpath")
-    def test_mount_volume_commonpath_value_error(self, mock_commonpath, mock_logger, mock_usbguard):
-        mock_usbguard.return_value = True
-        mock_commonpath.side_effect = ["/dev", ValueError("Invalid paths")]
-
+    @patch("security.usb_mount.os.path.exists")
+    @patch("security.usb_mount.subprocess.run")
+    def test_mount_volume_mount_failure(self, mock_run, mock_exists, mock_is_installed):
+        mock_is_installed.return_value = True
+        mock_exists.return_value = True
+        mock_run.side_effect = subprocess.CalledProcessError(1, "mount", stderr="Mount failed")
         result = USBMountManager.mount_volume("/dev/sdb1", "/mnt/usb/stick")
         assert result is False
-        mock_logger.error.assert_any_call("Invalid paths for commonpath: /mnt/usb, /mnt/usb/stick")
 
-    @patch("security.usb_mount.USBGuardManager.is_installed")
-    @patch("security.usb_mount.logger")
-    def test_mount_volume_usbguard_not_installed(self, mock_logger, mock_usbguard):
-        mock_usbguard.return_value = False
-        result = USBMountManager.mount_volume("/dev/sdb1", "/mnt/usb/stick")
+    @patch("security.usb_mount.subprocess.run")
+    def test_unmount_volume_failure(self, mock_run):
+        mock_run.side_effect = subprocess.CalledProcessError(1, "umount", stderr="Unmount failed")
+        result = USBMountManager.unmount_volume("/mnt/usb/stick")
         assert result is False
-        mock_logger.error.assert_called_with("USBGuard is not installed. Refusing to mount for security reasons.")

@@ -1,7 +1,7 @@
-import pytest
+from django.test import TestCase
 from pro.servers.models import Server
 
-@pytest.mark.django_db
-def test_server_str():
-    server = Server.objects.create(name="Prod Server", hostname_or_ip="1.2.3.4")
-    assert str(server) == "Prod Server (1.2.3.4)"
+class ServerExtendedTests(TestCase):
+    def test_str_method(self):
+        server = Server(name="Backup Server", hostname_or_ip="10.0.0.5")
+        assert str(server) == "Backup Server (10.0.0.5)"
