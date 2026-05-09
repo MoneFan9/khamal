@@ -2,7 +2,7 @@ from django.test import TestCase
 from django.contrib.auth import get_user_model
 from projects.models import Project
 from .models import Repository
-from .services import clone_repository, pull_repository, switch_branch, pull_repository_async, list_branches
+from .services import clone_repository, pull_repository, switch_branch, list_branches
 import os
 import shutil
 import tempfile
@@ -53,11 +53,6 @@ class GitManagerTest(TestCase):
 
         clone_repository(self.repository.id)
         mock_repo.clone_from.assert_not_called()
-
-    @patch('git_manager.services.git_executor')
-    def test_pull_repository_async(self, mock_executor):
-        pull_repository_async(self.repository.id)
-        mock_executor.submit.assert_called_once_with(pull_repository, self.repository.id)
 
     @patch('git_manager.services.git.Repo')
     def test_clone_repository_failure(self, mock_repo):

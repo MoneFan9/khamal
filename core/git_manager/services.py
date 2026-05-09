@@ -1,14 +1,10 @@
 import os
 import logging
 import git
-from concurrent.futures import ThreadPoolExecutor
 from django.utils import timezone
 from .models import Repository
 
 logger = logging.getLogger(__name__)
-
-# Executor for asynchronous Git operations
-git_executor = ThreadPoolExecutor(max_workers=4)
 
 def clone_repository(repo_id: int):
     """
@@ -43,12 +39,6 @@ def pull_repository(repo_id: int):
     except Exception as e:
         logger.error(f"Failed to pull repository {repo_id}: {e}")
         raise
-
-def pull_repository_async(repo_id: int):
-    """
-    Performs a git pull asynchronously.
-    """
-    git_executor.submit(pull_repository, repo_id)
 
 def switch_branch(repo_id: int, branch_name: str):
     """

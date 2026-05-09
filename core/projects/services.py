@@ -387,8 +387,8 @@ def _wait_for_healthy(container, timeout: int = 60):
         container.reload()
         health = container.attrs.get("State", {}).get("Health", {}).get("Status")
 
-        # If healthy OR (no health check AND running)
-        if health == "healthy" or (health is None and container.status == "running"):
+        # Healthy or Running (if no healthcheck defined)
+        if health == "healthy" or (not health and container.status == "running"):
             return True
 
         if container.status == "exited":

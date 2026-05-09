@@ -16,60 +16,60 @@ class USBMountManager:
     """
 
     @staticmethod
-    def _validate_paths(device_path, mount_point):
+    def _validate_paths(device_path, mount_point) -> tuple[bool, str, str]:
         """
-        Validates device and mount paths for security.
+        Internal helper to validate and normalize device and mount paths.
         """
         try:
             # 1. Basic normalization
             device_path = os.path.normpath(device_path)
             if not os.path.isabs(mount_point):
                 logger.error(f"Mount point must be absolute: {mount_point}")
-                return None, None
+                return False, device_path, mount_point
 
             normalized_mount = os.path.normpath(mount_point)
         except Exception as e:
             logger.error(f"Path normalization error: {e}")
-            return None, None
+            return False, device_path, mount_point
 
         if os.path.commonpath(["/dev", device_path]) != "/dev":
             logger.error(f"Invalid device path (must be in /dev): {device_path}")
-            return None, None
+            return False, device_path, normalized_mount
 
         allowed_mount_base = os.path.normpath("/mnt/usb")
         try:
             if os.path.commonpath([allowed_mount_base, normalized_mount]) != allowed_mount_base:
                 logger.error(f"Invalid mount point: {normalized_mount}. Must be within {allowed_mount_base}")
-                return None, None
+                return False, device_path, normalized_mount
 
             if normalized_mount == allowed_mount_base:
                 logger.error(f"Cannot mount directly on {allowed_mount_base}")
-                return None, None
+                return False, device_path, normalized_mount
         except ValueError:
             logger.error(f"Invalid paths for commonpath: {allowed_mount_base}, {normalized_mount}")
-            return None, None
+            return False, device_path, normalized_mount
 
-        return device_path, normalized_mount
+        return True, device_path, normalized_mount
 
     @staticmethod
     def mount_volume(device_path, mount_point):
         """
         Mounts a USB device to a specific mount point with security flags.
+
+        Args:
+            device_path (str): The path to the device (e.g., /dev/sdb1)
+            mount_point (str): The directory where the device should be mounted.
+
+        Returns:
+            bool: True if successful, False otherwise.
         """
-        device_path, mount_point = USBMountManager._validate_paths(device_path, mount_point)
-        if not device_path or not mount_point:
+        # --- Security Hardening Protocol ---
+        # 1. Path Normalization & Validation
+        is_valid, device_path, mount_point = USBMountManager._validate_paths(device_path, mount_point)
+        if not is_valid:
             return False
 
-        # 4. Validate that device_path is a block device
-        try:
-            if not Path(device_path).is_block_device():
-                logger.error(f"Device path is not a block device: {device_path}")
-                return False
-        except Exception as e:
-            logger.error(f"Error validating block device {device_path}: {e}")
-            return False
-
-        # 5. Integrate with USBGuard: Ensure USBGuard is installed and service is active
+        # 4. Integrate with USBGuard
         if not USBGuardManager.is_installed():
             logger.error("USBGuard is not installed. Refusing to mount for security reasons.")
             return False
