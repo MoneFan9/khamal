@@ -75,7 +75,6 @@ class LogSagePreprocessor:
         for score, i in scored_indices:
             if score < 80 or len(selected_indices) >= self.max_output_lines:
                 break
-
             context = range(max(0, i - self.context_window), min(total_logs, i + self.context_window + 1))
             for j in context:
                 if j not in selected_indices:

@@ -385,10 +385,8 @@ def _wait_for_healthy(container, timeout: int = 60):
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         container.reload()
-        state = container.attrs.get("State", {})
-        health = state.get("Health", {}).get("Status")
-
-        # Return True if healthy or if running (and no health check defined)
+        # If the container has a health check, wait for it; otherwise, just wait for 'running' status
+        health = container.attrs.get("State", {}).get("Health", {}).get("Status")
         if health == "healthy" or (health is None and container.status == "running"):
             return True
 
