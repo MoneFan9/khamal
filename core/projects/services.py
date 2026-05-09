@@ -20,7 +20,7 @@ DATABASE_IMAGES = {
 
 def _get_traefik_config() -> tuple[list[str], dict]:
     """
-    Helper to generate Traefik command and volumes.
+    Builds the Traefik command and volumes configuration.
     """
     command = [
         "--providers.docker=true",
@@ -29,16 +29,17 @@ def _get_traefik_config() -> tuple[list[str], dict]:
         "--entrypoints.web.address=:80",
         "--entrypoints.websecure.address=:443",
     ]
+
     volumes = {
         '/var/run/docker.sock': {'bind': '/var/run/docker.sock', 'mode': 'ro'}
     }
 
     if settings.KHAMAL_SSL_ENABLED:
         command.extend([
-            f"--certificatesresolvers.le.acme.email={settings.KHAMAL_ACME_EMAIL}",
-            f"--certificatesresolvers.le.acme.storage={settings.KHAMAL_ACME_STORAGE}",
+            "--certificatesresolvers.le.acme.email=" + settings.KHAMAL_ACME_EMAIL,
+            "--certificatesresolvers.le.acme.storage=" + settings.KHAMAL_ACME_STORAGE,
             "--certificatesresolvers.le.acme.tlschallenge=true",
-            f"--certificatesresolvers.le.acme.caserver={settings.KHAMAL_ACME_CA_SERVER}",
+            "--certificatesresolvers.le.acme.caserver=" + settings.KHAMAL_ACME_CA_SERVER,
             "--entrypoints.web.http.redirections.entryPoint.to=websecure",
             "--entrypoints.web.http.redirections.entryPoint.scheme=https",
         ])
@@ -72,6 +73,7 @@ def ensure_global_proxy():
     except docker.errors.NotFound:
         logger.info(f"Creating global Traefik container: {TRAEFIK_CONTAINER_NAME}")
         command, volumes = _get_traefik_config()
+
         client.containers.run(
             TRAEFIK_IMAGE,
             name=TRAEFIK_CONTAINER_NAME,
@@ -346,8 +348,11 @@ def create_deployment_container(deployment: Deployment, image: str):
         volumes = _get_deployment_volumes(deployment)
 
         network_obj = client.networks.get(project_network_id)
-        # SECURITY: Never use privileged=True, cap_add, or other privilege escalation flags.
-        # Least privilege is enforced via the docker-socket-proxy and isolated networks.
+
+        # SECURITY: Least Privilege Enforcement
+        # 1. We use a dedicated, isolated bridge network for each project.
+        # 2. Privileged mode and capability additions are strictly forbidden.
+        # 3. All Docker API calls are proxied through docker-socket-proxy.
         container = client.containers.run(
             image,
             detach=True,
@@ -383,6 +388,7 @@ def _wait_for_healthy(container, timeout: int = 60):
         state = container.attrs.get("State", {})
         health = state.get("Health", {}).get("Status")
 
+        # Return True if healthy or if running (and no health check defined)
         if health == "healthy" or (health is None and container.status == "running"):
             return True
 

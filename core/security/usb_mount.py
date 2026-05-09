@@ -19,6 +19,8 @@ class USBMountManager:
         Validates and normalizes device and mount paths.
         Returns normalized_mount if valid, else None.
         """
+        # --- Security Hardening Protocol ---
+        # 1. Path Normalization: Prevent traversal attacks (e.g., ../../etc/passwd)
         try:
             # 1. Basic normalization
             device_path = os.path.normpath(device_path)
@@ -67,7 +69,9 @@ class USBMountManager:
                 logger.error(f"Failed to create mount point {normalized_mount}: {e}")
                 return False
 
-        # Security flags
+        # -o noexec: Blocks execution of binaries (essential against malware).
+        # -o nosuid: Prevents privilege escalation via setuid/setgid bits.
+        # -o nodev: Disables device files interpretation.
         mount_options = "noexec,nosuid,nodev"
 
         try:
