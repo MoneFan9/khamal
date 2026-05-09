@@ -59,7 +59,7 @@ class Command(BaseCommand):
 
         try:
             while True:
-                deployments = Deployment.objects.filter(status=Deployment.Status.RUNNING).exclude(container_id__isnull=True)
+                deployments = Deployment.objects.filter(status=Deployment.Status.RUNNING).exclude(container_id__isnull=True).select_related('project')
 
                 if not deployments.exists():
                     self.stdout.write("No running deployments found. Waiting...", ending="\r")

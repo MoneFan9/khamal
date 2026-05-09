@@ -67,6 +67,7 @@ class MonitorContainersTests(TestCase):
         """Test handle loop when no deployments are running."""
         mock_qs = MagicMock()
         mock_qs.exclude.return_value = mock_qs
+        mock_qs.select_related.return_value = mock_qs
         mock_qs.exists.return_value = False
         mock_filter.return_value = mock_qs
 
@@ -93,6 +94,7 @@ class MonitorContainersTests(TestCase):
 
         mock_qs = MagicMock()
         mock_qs.exclude.return_value = mock_qs
+        mock_qs.select_related.return_value = mock_qs
         mock_qs.__iter__.return_value = [mock_dep]
         mock_qs.exists.return_value = True
         mock_filter.return_value = mock_qs
@@ -132,6 +134,7 @@ class MonitorContainersTests(TestCase):
 
         mock_qs = MagicMock()
         mock_qs.exclude.return_value = mock_qs
+        mock_qs.select_related.return_value = mock_qs
         mock_qs.__iter__.return_value = [mock_dep]
         mock_qs.exists.return_value = True
         mock_filter.return_value = mock_qs
@@ -161,6 +164,7 @@ class MonitorContainersTests(TestCase):
 
         mock_qs = MagicMock()
         mock_qs.exclude.return_value = mock_qs
+        mock_qs.select_related.return_value = mock_qs
         mock_qs.__iter__.return_value = [mock_dep]
         mock_qs.exists.return_value = True
         mock_filter.return_value = mock_qs
