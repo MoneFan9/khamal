@@ -21,6 +21,7 @@ class USBMountManager:
         # --- Security Hardening Protocol ---
         # 1. Path Normalization: Prevent traversal attacks (e.g., ../../etc/passwd)
         try:
+            # 1. Basic normalization
             device_path = os.path.normpath(device_path)
             if not os.path.isabs(mount_point):
                 logger.error(f"Mount point must be absolute: {mount_point}")
