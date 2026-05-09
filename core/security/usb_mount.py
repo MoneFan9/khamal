@@ -7,8 +7,10 @@ logger = logging.getLogger(__name__)
 
 class USBMountManager:
     """
-    Utility class to securely mount USB volumes.
-    Forces noexec, nosuid, and nodev options to prevent malware execution.
+    USBMountManager: Secure physical ingestion engine.
+
+    Khamal allows deploying code from physical USB drives. This class implements
+    strict security controls to prevent this "physical vector" from compromising the host.
     """
 
     @staticmethod
@@ -76,9 +78,9 @@ class USBMountManager:
                 logger.error(f"Failed to create mount point {mount_point}: {e}")
                 return False
 
-        # -o noexec: Do not allow direct execution of any binaries on the mounted filesystem.
-        # -o nosuid: Do not allow set-user-identifier or set-group-identifier bits to take effect.
-        # -o nodev: Do not interpret character or block special devices on the filesystem.
+        # -o noexec: Blocks execution of binaries (essential against malware).
+        # -o nosuid: Prevents privilege escalation via setuid/setgid bits.
+        # -o nodev: Disables device files interpretation.
         mount_options = "noexec,nosuid,nodev"
 
         try:
