@@ -35,6 +35,20 @@ class NixpacksPlan:
         all_pkgs = {p.lower() for p in self.packages + self.libraries + self.apt_packages}
         return bool(all_pkgs & redis_pkgs) or any("redis-server" in p for p in all_pkgs)
 
+    @property
+    def has_mysql(self) -> bool:
+        """Detects if MySQL is required."""
+        mysql_pkgs = {"mysql", "mysql-client", "mysql-server", "mysql-common", "libmysqlclient-dev", "default-mysql-client"}
+        all_pkgs = {p.lower() for p in self.packages + self.libraries + self.apt_packages}
+        return bool(all_pkgs & mysql_pkgs) or any("mysql" in p for p in all_pkgs)
+
+    @property
+    def has_mongodb(self) -> bool:
+        """Detects if MongoDB is required."""
+        mongo_pkgs = {"mongodb", "mongodb-clients", "mongodb-server", "mongodb-org"}
+        all_pkgs = {p.lower() for p in self.packages + self.libraries + self.apt_packages}
+        return bool(all_pkgs & mongo_pkgs) or any("mongodb" in p for p in all_pkgs)
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "NixpacksPlan":
         """

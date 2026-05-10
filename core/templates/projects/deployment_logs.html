@@ -21,12 +21,33 @@
                 Déploiement #{{ deployment.id }} - Statut: <span id="status-badge" class="font-semibold">{{ deployment.status }}</span>
             </p>
         </div>
-        <div class="flex items-center space-x-2">
-            <span class="flex h-3 w-3 relative">
-                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
-                <span class="relative inline-flex rounded-full h-3 w-3 bg-indigo-500"></span>
-            </span>
-            <span class="text-xs font-medium text-gray-500 uppercase">Live</span>
+        <div class="flex items-center space-x-4">
+            <button id="analyze-btn" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-black rounded-xl shadow-sm text-white bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all duration-300">
+                <i class="fas fa-brain mr-2"></i> Analyser avec LogSage
+            </button>
+            <div class="flex items-center space-x-2">
+                <span class="flex h-3 w-3 relative">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-3 w-3 bg-indigo-500"></span>
+                </span>
+                <span class="text-xs font-medium text-gray-500 uppercase">Live</span>
+            </div>
+        </div>
+    </div>
+    <div id="analysis-section" class="hidden border-b border-gray-200 bg-indigo-50/50 p-6">
+        <div class="flex items-center justify-between mb-4">
+            <h4 class="text-md font-black text-indigo-900 uppercase tracking-tight flex items-center">
+                <i class="fas fa-magic mr-2"></i> Diagnostic LogSage AI
+            </h4>
+            <button id="close-analysis" class="text-gray-400 hover:text-gray-600">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div id="analysis-content" class="prose prose-indigo max-w-none text-slate-700 font-medium leading-relaxed">
+            <div class="flex items-center space-x-3 text-indigo-600 animate-pulse">
+                <i class="fas fa-spinner fa-spin"></i>
+                <span>L'IA analyse vos logs en profondeur...</span>
+            </div>
         </div>
     </div>
     <div class="p-0">
@@ -74,6 +95,64 @@
         div.className = 'text-yellow-500 font-medium mt-2 p-2 bg-yellow-900/20 rounded';
         div.textContent = '[SYSTEM] Connexion fermée.';
         logContainer.appendChild(div);
+    };
+
+    // LogSage Analysis Logic
+    const analyzeBtn = document.getElementById('analyze-btn');
+    const analysisSection = document.getElementById('analysis-section');
+    const analysisContent = document.getElementById('analysis-content');
+    const closeAnalysis = document.getElementById('close-analysis');
+
+    closeAnalysis.onclick = () => analysisSection.classList.add('hidden');
+
+    analyzeBtn.onclick = async function() {
+        analysisSection.classList.remove('hidden');
+        analysisContent.innerHTML = `
+            <div class="flex items-center space-x-3 text-indigo-600 animate-pulse">
+                <i class="fas fa-spinner fa-spin"></i>
+                <span>L'IA analyse vos logs en profondeur...</span>
+            </div>
+        `;
+        analyzeBtn.disabled = true;
+        analyzeBtn.classList.add('opacity-50', 'cursor-not-allowed');
+
+        try {
+            const response = await fetch(`/api/projects/deployments/${deploymentId}/analyze/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token }}',
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                // Simplified markdown rendering for the demo/implementation
+                // In a production app, we would use a library like marked.js
+                const formattedAnalysis = data.analysis
+                    .replace(/### (.*)/g, '<h5 class="text-lg font-bold text-slate-900 mt-4 mb-2">$1</h5>')
+                    .replace(/\d\. \*\*(.*)\*\*/g, '<div class="mt-2"><strong class="text-indigo-600">$1</strong>')
+                    .replace(/```([\s\S]*?)```/g, '<pre class="bg-slate-900 text-slate-100 p-4 rounded-xl my-4 overflow-x-auto font-mono text-xs">$1</pre>')
+                    .replace(/\n/g, '<br>');
+
+                analysisContent.innerHTML = `
+                    <div class="bg-white rounded-2xl p-6 border border-indigo-100 shadow-sm">
+                        ${formattedAnalysis}
+                        <div class="mt-6 pt-4 border-t border-slate-100 text-[10px] text-slate-400 font-bold uppercase tracking-widest">
+                            Analyse basée sur ${data.logs_used} lignes de logs prioritaires.
+                        </div>
+                    </div>
+                `;
+            } else {
+                analysisContent.innerHTML = `<div class="text-rose-600 font-bold"><i class="fas fa-exclamation-triangle mr-2"></i> ${data.error || 'Une erreur est survenue lors de l\'analyse.'}</div>`;
+            }
+        } catch (error) {
+            analysisContent.innerHTML = `<div class="text-rose-600 font-bold"><i class="fas fa-exclamation-triangle mr-2"></i> Erreur réseau : Impossible de contacter le moteur d'IA.</div>`;
+        } finally {
+            analyzeBtn.disabled = false;
+            analyzeBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        }
     };
 </script>
 {% endblock %}

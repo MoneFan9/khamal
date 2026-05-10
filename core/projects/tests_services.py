@@ -448,7 +448,9 @@ class ProvisioningServiceTest(TestCase):
         plan = MagicMock()
         plan.has_postgres = True
         plan.has_redis = True
+        plan.has_mysql = True
+        plan.has_mongodb = True
 
         auto_provision_from_plan(self.project, plan)
 
-        self.assertEqual(mock_provision.call_count, 2)
+        self.assertEqual(mock_provision.call_count, 4)
