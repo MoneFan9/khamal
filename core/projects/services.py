@@ -16,6 +16,8 @@ TRAEFIK_IMAGE = "traefik:v3.1"
 DATABASE_IMAGES = {
     "postgres": "postgres:16-alpine",
     "redis": "redis:7-alpine",
+    "mysql": "mysql:8",
+    "mongodb": "mongo:7",
 }
 
 def _get_traefik_config() -> tuple[list[str], dict[str, dict]]:
@@ -85,36 +87,6 @@ def ensure_global_proxy():
             command=command,
             labels={"khamal.managed": "true"}
         )
-
-def _get_traefik_config() -> tuple[list[str], dict]:
-    """
-    Returns the command and volumes for the global Traefik container.
-    """
-    command = [
-        "--providers.docker=true",
-        "--providers.docker.exposedbydefault=false",
-        f"--providers.docker.network={PROXY_NETWORK_NAME}",
-        "--entrypoints.web.address=:80",
-        "--entrypoints.websecure.address=:443",
-    ]
-
-    volumes = {
-        '/var/run/docker.sock': {'bind': '/var/run/docker.sock', 'mode': 'ro'}
-    }
-
-    if settings.KHAMAL_SSL_ENABLED:
-        command.extend([
-            "--certificatesresolvers.le.acme.email=" + settings.KHAMAL_ACME_EMAIL,
-            "--certificatesresolvers.le.acme.storage=" + settings.KHAMAL_ACME_STORAGE,
-            "--certificatesresolvers.le.acme.tlschallenge=true",
-            "--certificatesresolvers.le.acme.caserver=" + settings.KHAMAL_ACME_CA_SERVER,
-            "--entrypoints.web.http.redirections.entryPoint.to=websecure",
-            "--entrypoints.web.http.redirections.entryPoint.scheme=https",
-        ])
-        # Persist certificates
-        volumes['khamal-letsencrypt'] = {'bind': '/letsencrypt', 'mode': 'rw'}
-
-    return command, volumes
 
 def ensure_project_network(project: Project) -> str:
     """
@@ -411,10 +383,29 @@ def _get_db_config(engine: str, project_id: int) -> tuple[dict, dict]:
             "POSTGRES_USER": "khamal",
             "POSTGRES_PASSWORD": secrets.token_urlsafe(16)
         }
+    elif engine == "mysql":
+        environment = {
+            "MYSQL_DATABASE": "khamal",
+            "MYSQL_USER": "khamal",
+            "MYSQL_PASSWORD": secrets.token_urlsafe(16),
+            "MYSQL_RANDOM_ROOT_PASSWORD": "yes"
+        }
+    elif engine == "mongodb":
+        environment = {
+            "MONGO_INITDB_DATABASE": "khamal"
+        }
+
+    bind_path = "/data"
+    if engine == "postgres":
+        bind_path = "/var/lib/postgresql/data"
+    elif engine == "mysql":
+        bind_path = "/var/lib/mysql"
+    elif engine == "mongodb":
+        bind_path = "/data/db"
 
     volumes = {
         f"khamal-data-{engine}-{project_id}": {
-            "bind": "/var/lib/postgresql/data" if engine == "postgres" else "/data",
+            "bind": bind_path,
             "mode": "rw"
         }
     }
@@ -482,6 +473,12 @@ def auto_provision_from_plan(project: Project, plan):
 
     if plan.has_redis:
         provision_database(project, "redis")
+
+    if plan.has_mysql:
+        provision_database(project, "mysql")
+
+    if plan.has_mongodb:
+        provision_database(project, "mongodb")
 
 def get_deployment_logs(deployment: Deployment, tail: int = 1000) -> str:
     """
