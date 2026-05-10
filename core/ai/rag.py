@@ -129,6 +129,12 @@ Analyze the following preprocessed logs to perform a technical Root Cause Analys
         )
         return RCAPrompt(system=self.system_prompt, user=user_content)
 
+    def get_system_prompt(self) -> str:
+        """
+        Returns the system prompt currently used by the builder.
+        """
+        return self.system_prompt
+
     def __repr__(self) -> str:
         return (
             f"RCAPromptBuilder("
