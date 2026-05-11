@@ -90,28 +90,12 @@ class LogSagePreprocessor:
             if i not in selected_indices:
                 selected_indices.add(i)
 
-    def _prioritize_logs(self, logs: List[str]) -> List[str]:
+    def _get_scored_indices(self, logs: List[str]) -> List[tuple]:
         """
-        Implementation of the Multi-Phase Prioritization Strategy (MPPS).
-
-        This algorithm ensures that local LLMs receive the most semantically dense
-        information within their context window limit (max_output_lines).
-
-        Strategy:
-        1. Anchors: First, we identify "Ground Zero" lines—those with high severity
-           scores (>= 80). These are the definitive error messages.
-        2. Proximity: We expand the selection around each anchor by 'context_window' lines.
-           This captures the stack trace leading to the error, which is often more
-           valuable for the AI than the error message itself.
-        3. Recency-Weighted Relevance: If space remains, we fill it with other logs.
-           We use a hybrid score: Severity + (Index / Total) * 10. This ensures that
-           late-occurring warnings take precedence over early-occurring ones.
+        Calculates severity scores for each log line, weighted by recency.
         """
         total_logs = len(logs)
-        if total_logs == 0:
-            return []
-
-        scored_indices = sorted(
+        return sorted(
             [
                 (self.get_severity_score(log) + (i / total_logs) * 10, i)
                 for i, log in enumerate(logs)
@@ -120,13 +104,31 @@ class LogSagePreprocessor:
             reverse=True
         )
 
+    def _prioritize_logs(self, logs: List[str]) -> List[str]:
+        """
+        Implementation of the Multi-Phase Prioritization Strategy (MPPS).
+
+        This algorithm ensures that local LLMs receive the most semantically dense
+        information within their context window limit (max_output_lines).
+
+        Strategy:
+        1. Anchors: First, we identify "Ground Zero" lines (severity >= 80).
+        2. Proximity: Expand selection around anchors by 'context_window' lines.
+        3. Recency-Weighted Relevance: Fill remaining space with other logs.
+        """
+        total_logs = len(logs)
+        if total_logs == 0:
+            return []
+
+        scored_indices = self._get_scored_indices(logs)
         selected_indices = set()
 
+        # Execute MPPS phases
         self._add_anchors(scored_indices, selected_indices)
         self._add_context_window(scored_indices, selected_indices, total_logs)
         self._fill_remaining_quota(scored_indices, selected_indices)
 
-        # Re-sort chronologically
+        # Re-sort chronologically for the LLM
         return [logs[i] for i in sorted(list(selected_indices))]
 
     def process(self, raw_logs: str) -> List[str]:
