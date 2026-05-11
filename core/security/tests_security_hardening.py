@@ -6,7 +6,7 @@ import subprocess
 
 class SecurityHardeningTests(TestCase):
 
-    @patch("security.usb_mount.Path.is_block_device")
+    @patch("security.usb_mount.pathlib.Path.is_block_device")
     @patch("security.usb_mount.USBGuardManager.is_service_active")
     @patch("security.usb_mount.USBGuardManager.is_installed")
     def test_mount_fails_if_not_block_device(self, mock_installed, mock_active, mock_block):
@@ -17,7 +17,7 @@ class SecurityHardeningTests(TestCase):
         result = USBMountManager.mount_volume("/dev/sdb1", "/mnt/usb/stick")
         self.assertFalse(result)
 
-    @patch("security.usb_mount.Path.is_block_device")
+    @patch("security.usb_mount.pathlib.Path.is_block_device")
     @patch("security.usb_mount.USBGuardManager.is_service_active")
     @patch("security.usb_mount.USBGuardManager.is_installed")
     def test_mount_fails_if_service_inactive(self, mock_installed, mock_active, mock_block):
@@ -28,7 +28,7 @@ class SecurityHardeningTests(TestCase):
         result = USBMountManager.mount_volume("/dev/sdb1", "/mnt/usb/stick")
         self.assertFalse(result)
 
-    @patch("security.usb_mount.Path.is_block_device")
+    @patch("security.usb_mount.pathlib.Path.is_block_device")
     @patch("security.usb_mount.USBGuardManager.list_devices")
     @patch("security.usb_mount.USBGuardManager.is_service_active")
     @patch("security.usb_mount.USBGuardManager.is_installed")
@@ -41,7 +41,7 @@ class SecurityHardeningTests(TestCase):
         result = USBMountManager.mount_volume("/dev/sdb1", "/mnt/usb/stick")
         self.assertFalse(result)
 
-    @patch("security.usb_mount.Path.is_block_device")
+    @patch("security.usb_mount.pathlib.Path.is_block_device")
     @patch("security.usb_mount.USBGuardManager.list_devices")
     @patch("security.usb_mount.USBGuardManager.is_service_active")
     @patch("security.usb_mount.USBGuardManager.is_installed")
@@ -54,7 +54,7 @@ class SecurityHardeningTests(TestCase):
         result = USBMountManager.mount_volume("/dev/sdb1", "/mnt/usb/stick")
         self.assertFalse(result)
 
-    @patch("security.usb_mount.Path.is_block_device")
+    @patch("security.usb_mount.pathlib.Path.is_block_device")
     @patch("security.usb_mount.USBGuardManager.list_devices")
     @patch("security.usb_mount.USBGuardManager.is_service_active")
     @patch("security.usb_mount.USBGuardManager.is_installed")

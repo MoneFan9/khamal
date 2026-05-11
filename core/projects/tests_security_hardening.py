@@ -46,7 +46,7 @@ class SecurityHardeningTests(TestCase):
         self.assertFalse(serializer.is_valid())
         self.assertIn('host_path', serializer.errors)
 
-    @patch("security.usb_mount.Path.is_block_device")
+    @patch("security.usb_mount.pathlib.Path.is_block_device")
     @patch("security.usb_mount.USBGuardManager.list_devices")
     @patch("security.usb_mount.USBGuardManager.is_service_active")
     @patch("security.usb_mount.USBGuardManager.is_installed")

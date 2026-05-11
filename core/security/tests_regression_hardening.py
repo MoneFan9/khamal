@@ -29,7 +29,7 @@ class RegressionSecurityHardeningTests(TestCase):
             _ = client._client
         self.assertIn("Direct access to low-level Docker API '_client' is restricted", str(cm.exception))
 
-    @patch("security.usb_mount.Path.is_block_device")
+    @patch("security.usb_mount.pathlib.Path.is_block_device")
     @patch("security.usb_mount.USBGuardManager.list_devices")
     @patch("security.usb_mount.USBGuardManager.is_service_active")
     @patch("security.usb_mount.USBGuardManager.is_installed")
@@ -56,7 +56,7 @@ class RegressionSecurityHardeningTests(TestCase):
         result = USBMountManager.mount_volume("/dev/sdb", "/mnt/usb/stick")
         self.assertFalse(result, "Should not allow /dev/sdb when only /dev/sdb1 is authorized")
 
-    @patch("security.usb_mount.Path.is_block_device")
+    @patch("security.usb_mount.pathlib.Path.is_block_device")
     @patch("security.usb_mount.USBGuardManager.list_devices")
     @patch("security.usb_mount.USBGuardManager.is_service_active")
     @patch("security.usb_mount.USBGuardManager.is_installed")
