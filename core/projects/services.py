@@ -86,36 +86,6 @@ def ensure_global_proxy():
             labels={"khamal.managed": "true"}
         )
 
-def _get_traefik_config() -> tuple[list[str], dict]:
-    """
-    Returns the command and volumes for the global Traefik container.
-    """
-    command = [
-        "--providers.docker=true",
-        "--providers.docker.exposedbydefault=false",
-        f"--providers.docker.network={PROXY_NETWORK_NAME}",
-        "--entrypoints.web.address=:80",
-        "--entrypoints.websecure.address=:443",
-    ]
-
-    volumes = {
-        '/var/run/docker.sock': {'bind': '/var/run/docker.sock', 'mode': 'ro'}
-    }
-
-    if settings.KHAMAL_SSL_ENABLED:
-        command.extend([
-            "--certificatesresolvers.le.acme.email=" + settings.KHAMAL_ACME_EMAIL,
-            "--certificatesresolvers.le.acme.storage=" + settings.KHAMAL_ACME_STORAGE,
-            "--certificatesresolvers.le.acme.tlschallenge=true",
-            "--certificatesresolvers.le.acme.caserver=" + settings.KHAMAL_ACME_CA_SERVER,
-            "--entrypoints.web.http.redirections.entryPoint.to=websecure",
-            "--entrypoints.web.http.redirections.entryPoint.scheme=https",
-        ])
-        # Persist certificates
-        volumes['khamal-letsencrypt'] = {'bind': '/letsencrypt', 'mode': 'rw'}
-
-    return command, volumes
-
 def ensure_project_network(project: Project) -> str:
     """
     Ensures an isolated bridge network exists for the project.
@@ -320,6 +290,23 @@ def _get_deployment_volumes(deployment: Deployment) -> dict:
             logger.warning(f"Hot-Reload enabled for deployment {deployment.id} but no LocalSource found for project {deployment.project.id}")
     return volumes
 
+def _setup_deployment_container_metadata(deployment: Deployment) -> tuple[str, dict, dict]:
+    """
+    Prepares the metadata for a deployment container, including network ID,
+    routing labels, and volumes.
+    """
+    # 1. Ensure networks exist
+    ensure_global_proxy()
+    project_network_id = ensure_project_network(deployment.project)
+
+    # 2. Get routing labels
+    labels = get_routing_labels(deployment)
+
+    # 3. Prepare volumes (e.g., for Hot-Reload)
+    volumes = _get_deployment_volumes(deployment)
+
+    return project_network_id, labels, volumes
+
 def create_deployment_container(deployment: Deployment, image: str):
     """
     Creates and starts a container for the deployment with proper networks and labels.
@@ -330,22 +317,14 @@ def create_deployment_container(deployment: Deployment, image: str):
     2. The global proxy network (for external access via Traefik).
     """
     client = get_docker_client()
-    project = deployment.project
 
-    # 1. Ensure networks exist
-    ensure_global_proxy()
-    project_network_id = ensure_project_network(project)
+    # Get configuration metadata
+    project_network_id, labels, volumes = _setup_deployment_container_metadata(deployment)
 
-    # 2. Get routing labels
-    labels = get_routing_labels(deployment)
-
-    # 3. Create and run container
+    # Create and run container
     try:
         deployment.status = Deployment.Status.STARTING
         deployment.save(update_fields=['status'])
-
-        # Prepare volumes (e.g., for Hot-Reload)
-        volumes = _get_deployment_volumes(deployment)
 
         network_obj = client.networks.get(project_network_id)
 
