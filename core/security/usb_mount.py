@@ -21,13 +21,13 @@ class USBMountManager:
         Internal helper to validate and normalize device and mount paths.
         """
         try:
-            # 1. Basic normalization
-            device_path = os.path.normpath(device_path)
+            # 1. Basic normalization & Symlink resolution
+            device_path = os.path.realpath(device_path)
             if not os.path.isabs(mount_point):
                 logger.error(f"Mount point must be absolute: {mount_point}")
                 return False, device_path, mount_point
 
-            normalized_mount = os.path.normpath(mount_point)
+            normalized_mount = os.path.realpath(mount_point)
         except Exception as e:
             logger.error(f"Path normalization error: {e}")
             return False, device_path, mount_point
@@ -65,8 +65,16 @@ class USBMountManager:
         """
         # --- Security Hardening Protocol ---
         # 1. Path Normalization & Validation
-        is_valid, device_path, mount_point = USBMountManager._validate_paths(device_path, mount_point)
+        is_valid, device_path, normalized_mount = USBMountManager._validate_paths(device_path, mount_point)
         if not is_valid:
+            return False
+
+        # Use the normalized and validated mount point
+        mount_point = normalized_mount
+
+        # 2. Block Device Validation
+        if not Path(device_path).is_block_device():
+            logger.error(f"Device path is not a block device: {device_path}")
             return False
 
         # 4. Integrate with USBGuard
@@ -90,10 +98,10 @@ class USBMountManager:
         parent_device = device_path.rstrip('0123456789')
 
         authorized = False
-        # Use regex with word boundaries to avoid partial matches (e.g., /dev/sdb matching /dev/sdb1)
-        # and ensure 'allow' is present in the line.
-        # We use a negative lookahead to ensure the path is not just a prefix (e.g. /dev/sdb vs /dev/sdb1)
-        path_pattern = re.compile(rf"\ballow\b.*({re.escape(device_path)}|{re.escape(parent_device)})(?![\w/])")
+        # Use regex to match the authorization status strictly at the beginning of the line
+        # to prevent bypasses via malicious device names/serials containing 'allow'.
+        # We also use word boundaries and negative lookahead for path precision.
+        path_pattern = re.compile(rf"^\s*\d+:\s*\ballow\b.*({re.escape(device_path)}|{re.escape(parent_device)})(?![\w/])")
 
         logger.debug(f"Checking USBGuard authorization for {device_path} (parent: {parent_device})")
         for line in devices.splitlines():
@@ -107,9 +115,9 @@ class USBMountManager:
 
         if not os.path.exists(mount_point):
             try:
-                os.makedirs(normalized_mount, exist_ok=True)
+                os.makedirs(mount_point, exist_ok=True)
             except OSError as e:
-                logger.error(f"Failed to create mount point {normalized_mount}: {e}")
+                logger.error(f"Failed to create mount point {mount_point}: {e}")
                 return False
 
         # -o noexec: Blocks execution of binaries (essential against malware).
@@ -118,12 +126,12 @@ class USBMountManager:
         mount_options = "noexec,nosuid,nodev"
 
         try:
-            command = ["sudo", "mount", "-o", mount_options, device_path, normalized_mount]
+            command = ["sudo", "mount", "-o", mount_options, device_path, mount_point]
             subprocess.run(command, check=True, capture_output=True, text=True)
-            logger.info(f"Successfully mounted {device_path} to {normalized_mount} with security options.")
+            logger.info(f"Successfully mounted {device_path} to {mount_point} with security options.")
             return True
         except subprocess.CalledProcessError as e:
-            logger.error(f"Failed to mount {device_path} to {normalized_mount}: {e.stderr}")
+            logger.error(f"Failed to mount {device_path} to {mount_point}: {e.stderr}")
             return False
 
     @staticmethod
