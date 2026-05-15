@@ -19,24 +19,31 @@ class USBMountManager:
     def _validate_paths(device_path, mount_point) -> tuple[bool, str, str]:
         """
         Internal helper to validate and normalize device and mount paths.
+        Uses realpath to resolve symlinks and enforces block device checks.
         """
         try:
-            # 1. Basic normalization
-            device_path = os.path.normpath(device_path)
+            # 1. Resolve symlinks and normalize paths
+            device_path = os.path.realpath(device_path)
             if not os.path.isabs(mount_point):
                 logger.error(f"Mount point must be absolute: {mount_point}")
                 return False, device_path, mount_point
 
-            normalized_mount = os.path.normpath(mount_point)
+            normalized_mount = os.path.realpath(mount_point)
         except Exception as e:
             logger.error(f"Path normalization error: {e}")
             return False, device_path, mount_point
 
+        # 2. Block Device Validation
+        if not Path(device_path).is_block_device():
+            logger.error(f"Security Violation: {device_path} is not a block device.")
+            return False, device_path, normalized_mount
+
+        # 3. Path Restriction Enforcement
         if os.path.commonpath(["/dev", device_path]) != "/dev":
             logger.error(f"Invalid device path (must be in /dev): {device_path}")
             return False, device_path, normalized_mount
 
-        allowed_mount_base = os.path.normpath("/mnt/usb")
+        allowed_mount_base = os.path.realpath("/mnt/usb")
         try:
             if os.path.commonpath([allowed_mount_base, normalized_mount]) != allowed_mount_base:
                 logger.error(f"Invalid mount point: {normalized_mount}. Must be within {allowed_mount_base}")
@@ -107,9 +114,9 @@ class USBMountManager:
 
         if not os.path.exists(mount_point):
             try:
-                os.makedirs(normalized_mount, exist_ok=True)
+                os.makedirs(mount_point, exist_ok=True)
             except OSError as e:
-                logger.error(f"Failed to create mount point {normalized_mount}: {e}")
+                logger.error(f"Failed to create mount point {mount_point}: {e}")
                 return False
 
         # -o noexec: Blocks execution of binaries (essential against malware).
@@ -118,12 +125,12 @@ class USBMountManager:
         mount_options = "noexec,nosuid,nodev"
 
         try:
-            command = ["sudo", "mount", "-o", mount_options, device_path, normalized_mount]
+            command = ["sudo", "mount", "-o", mount_options, device_path, mount_point]
             subprocess.run(command, check=True, capture_output=True, text=True)
-            logger.info(f"Successfully mounted {device_path} to {normalized_mount} with security options.")
+            logger.info(f"Successfully mounted {device_path} to {mount_point} with security options.")
             return True
         except subprocess.CalledProcessError as e:
-            logger.error(f"Failed to mount {device_path} to {normalized_mount}: {e.stderr}")
+            logger.error(f"Failed to mount {device_path} to {mount_point}: {e.stderr}")
             return False
 
     @staticmethod
