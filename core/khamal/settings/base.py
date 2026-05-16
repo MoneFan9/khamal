@@ -95,6 +95,7 @@ ASGI_APPLICATION = "khamal.asgi.application"
 DATABASES = {
     "default": env.db("DATABASE_URL", default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}"),
 }
+DATABASES["default"]["CONN_MAX_AGE"] = 60
 
 
 # Password validation
@@ -156,4 +157,4 @@ KHAMAL_ACME_CA_SERVER = env("KHAMAL_ACME_CA_SERVER", default="https://acme-v02.a
 
 # Ollama Configuration
 OLLAMA_URL = env("OLLAMA_URL", default="http://localhost:11434")
-OLLAMA_KEEP_ALIVE = env("OLLAMA_KEEP_ALIVE", default="5m")
+OLLAMA_KEEP_ALIVE = env("OLLAMA_KEEP_ALIVE", default="0")
