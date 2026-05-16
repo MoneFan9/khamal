@@ -1,0 +1,62 @@
+name: Chaos Engineering & LogSage Verification
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  chaos-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r core/requirements.txt
+          pip install pytest pytest-django pytest-cov requests-mock
+
+      - name: Run Chaos Unit Tests
+        env:
+          DJANGO_SETTINGS_MODULE: khamal.settings.development
+          PYTHONPATH: core:pro:.
+        run: |
+          python -m pytest core/ai/tests_chaos_engineering.py --cov=core/ai --cov-report=xml
+
+      - name: Generate Live Chaos Logs
+        run: |
+          python scripts/generate_chaos_logs.py
+
+      - name: Verify LogSage Preprocessor on Live Logs
+        env:
+          DJANGO_SETTINGS_MODULE: khamal.settings.development
+          PYTHONPATH: core:pro:.
+        run: |
+          # Simple verification script that uses LogSagePreprocessor on generated logs
+          python -c "
+from core.ai.logsage import LogSagePreprocessor
+from pathlib import Path
+import sys
+
+preprocessor = LogSagePreprocessor()
+log_files = list(Path('chaos_logs').glob('*.log'))
+if not log_files:
+    print('No chaos logs found!')
+    sys.exit(1)
+
+for log_file in log_files:
+    print(f'Processing {log_file}...')
+    logs = log_file.read_text()
+    processed = preprocessor.process(logs)
+    if not processed:
+        print(f'LogSage failed to process {log_file}')
+        sys.exit(1)
+    print(f'Successfully processed {len(processed)} lines from {log_file}')
+"
