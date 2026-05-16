@@ -137,8 +137,11 @@ class LogSagePreprocessor:
         if not raw_logs:
             return []
 
+        import io
         # Use generator expressions to reduce memory overhead
-        lines = (line.strip() for line in raw_logs.splitlines() if line.strip())
+        # io.StringIO avoids raw_logs.splitlines() which creates a large intermediate list
+        log_stream = io.StringIO(raw_logs)
+        lines = (line.strip() for line in log_stream if line.strip())
         filtered = (line for line in lines if not self.is_noise(line))
 
         # Deduplicate using a generator-friendly approach
