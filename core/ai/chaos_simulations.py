@@ -76,3 +76,51 @@ SyntaxError: invalid syntax
             "fixed_block": "def list_items(request):",
             "rationale": "Missing colon after function definition in api/v1/endpoints.py."
         }
+
+    @staticmethod
+    def get_dependency_failure():
+        return {
+            "name": "Missing Dependency / Typo",
+            "logs": """
+Traceback (most recent call last):
+  File "app.py", line 1, in <module>
+    import requestss
+ModuleNotFoundError: No module named 'requestss'
+            """,
+            "project_context": {
+                "project_name": "Data-Fetcher",
+                "language": "Python/Script",
+                "environment": "Development"
+            },
+            "broken_file": "app.py",
+            "broken_content": "import requestss\n\ndef main():\n    pass",
+            "fixed_content": "import requests\n\ndef main():\n    pass",
+            "search_block": "import requestss",
+            "fixed_block": "import requests",
+            "rationale": "Fixed a typo in the import statement: 'requestss' to 'requests'."
+        }
+
+    @staticmethod
+    def get_config_error():
+        return {
+            "name": "Missing Environment Variable",
+            "logs": """
+[CRITICAL] Application failed to start
+Traceback (most recent call last):
+  File "config.py", line 5, in <module>
+    SECRET_KEY = os.environ["SECRET_KEEY"]
+  File "<frozen os>", line 679, in __getitem__
+KeyError: 'SECRET_KEEY'
+            """,
+            "project_context": {
+                "project_name": "Auth-Service",
+                "language": "Python/Django",
+                "environment": "Production"
+            },
+            "broken_file": "config.py",
+            "broken_content": "import os\n\nSECRET_KEY = os.environ[\"SECRET_KEEY\"]\nDEBUG = False",
+            "fixed_content": "import os\n\nSECRET_KEY = os.environ[\"SECRET_KEY\"]\nDEBUG = False",
+            "search_block": "os.environ[\"SECRET_KEEY\"]",
+            "fixed_block": "os.environ[\"SECRET_KEY\"]",
+            "rationale": "Corrected the environment variable key from 'SECRET_KEEY' to 'SECRET_KEY'."
+        }
