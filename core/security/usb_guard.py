@@ -54,6 +54,8 @@ class USBGuardManager:
     @staticmethod
     def list_devices():
         """Lists currently recognized USB devices."""
+        if not USBGuardManager.is_installed():
+            return None
         try:
             result = subprocess.run(["usbguard", "list-devices"], capture_output=True, text=True, check=True)
             return result.stdout
