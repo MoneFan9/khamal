@@ -47,7 +47,7 @@ class HardenedDockerClient:
         return super().__getattribute__(name)
 
     def __getattr__(self, name):
-        return getattr(self._client, name)
+        return getattr(object.__getattribute__(self, '_client'), name)
 
 def get_docker_client():
     """
