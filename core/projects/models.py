@@ -18,6 +18,10 @@ class Project(models.Model):
     network_id = models.CharField(max_length=255, blank=True, null=True)
     domain = models.CharField(max_length=255, blank=True, null=True)
 
+    # Database credentials persistence
+    db_postgres_password = models.CharField(max_length=255, blank=True, null=True)
+    db_redis_password = models.CharField(max_length=255, blank=True, null=True)
+
     def __str__(self):
         return self.name
 
