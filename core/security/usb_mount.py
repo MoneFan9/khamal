@@ -65,8 +65,13 @@ class USBMountManager:
         """
         # --- Security Hardening Protocol ---
         # 1. Path Normalization & Validation
-        is_valid, device_path, mount_point = USBMountManager._validate_paths(device_path, mount_point)
+        is_valid, device_path, normalized_mount = USBMountManager._validate_paths(device_path, mount_point)
         if not is_valid:
+            return False
+
+        # 3. Ensure it is a block device (prevent mounting regular files)
+        if not Path(device_path).is_block_device():
+            logger.error(f"Device {device_path} is not a block device.")
             return False
 
         # 4. Integrate with USBGuard
