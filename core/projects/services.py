@@ -400,20 +400,31 @@ def _wait_for_healthy(container, timeout: int = 60):
         time.sleep(2)
     return False
 
-def _get_db_config(engine: str, project_id: int) -> tuple[dict, dict]:
+def _get_db_config(project: Project, engine: str) -> tuple[dict, dict]:
     """
     Returns the environment variables and volume mappings for the database engine.
     """
     environment = {}
     if engine == "postgres":
+        if not project.db_postgres_password:
+            project.db_postgres_password = secrets.token_urlsafe(16)
+            project.save(update_fields=["db_postgres_password"])
+
         environment = {
             "POSTGRES_DB": "khamal",
             "POSTGRES_USER": "khamal",
-            "POSTGRES_PASSWORD": secrets.token_urlsafe(16)
+            "POSTGRES_PASSWORD": project.db_postgres_password
         }
+    elif engine == "redis":
+        if not project.db_redis_password:
+            project.db_redis_password = secrets.token_urlsafe(16)
+            project.save(update_fields=["db_redis_password"])
+
+        # Redis doesn't use environment variables for password by default in redis:7-alpine
+        # but we persist it for future use/consistency.
 
     volumes = {
-        f"khamal-data-{engine}-{project_id}": {
+        f"khamal-data-{engine}-{project.id}": {
             "bind": "/var/lib/postgresql/data" if engine == "postgres" else "/data",
             "mode": "rw"
         }
@@ -440,7 +451,7 @@ def provision_database(project: Project, engine: str):
     except docker.errors.NotFound:
         logger.info(f"Provisioning new {engine} container: {container_name}")
 
-    environment, volumes = _get_db_config(engine, project.id)
+    environment, volumes = _get_db_config(project, engine)
 
     try:
         # SECURITY: Privileged mode and cap_add are strictly forbidden.
