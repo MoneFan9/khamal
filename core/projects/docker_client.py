@@ -47,7 +47,9 @@ class HardenedDockerClient:
         return super().__getattribute__(name)
 
     def __getattr__(self, name):
-        return getattr(self._client, name)
+        # Use object.__getattribute__ to bypass our own security check on _client
+        client = object.__getattribute__(self, '_client')
+        return getattr(client, name)
 
 def get_docker_client():
     """
