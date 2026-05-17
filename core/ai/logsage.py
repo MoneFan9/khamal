@@ -90,6 +90,21 @@ class LogSagePreprocessor:
             if i not in selected_indices:
                 selected_indices.add(i)
 
+    def _get_scored_indices(self, logs: List[str]) -> List[tuple]:
+        """
+        Calculates and returns a sorted list of (score, index) tuples.
+        Score is a hybrid of severity and recency.
+        """
+        total_logs = len(logs)
+        return sorted(
+            [
+                (self.get_severity_score(log) + (i / total_logs) * 10, i)
+                for i, log in enumerate(logs)
+            ],
+            key=lambda x: x[0],
+            reverse=True
+        )
+
     def _prioritize_logs(self, logs: List[str]) -> List[str]:
         """
         Implementation of the Multi-Phase Prioritization Strategy (MPPS).
@@ -107,23 +122,14 @@ class LogSagePreprocessor:
            We use a hybrid score: Severity + (Index / Total) * 10. This ensures that
            late-occurring warnings take precedence over early-occurring ones.
         """
-        total_logs = len(logs)
-        if total_logs == 0:
+        if not logs:
             return []
 
-        scored_indices = sorted(
-            [
-                (self.get_severity_score(log) + (i / total_logs) * 10, i)
-                for i, log in enumerate(logs)
-            ],
-            key=lambda x: x[0],
-            reverse=True
-        )
-
+        scored_indices = self._get_scored_indices(logs)
         selected_indices = set()
 
         self._add_anchors(scored_indices, selected_indices)
-        self._add_context_window(scored_indices, selected_indices, total_logs)
+        self._add_context_window(scored_indices, selected_indices, len(logs))
         self._fill_remaining_quota(scored_indices, selected_indices)
 
         # Re-sort chronologically
@@ -149,15 +155,8 @@ class LogSagePreprocessor:
                     yield item
                 prev = item
 
-        deduplicated_gen = gen_deduplicate(filtered)
-
-        # Convert to list only when necessary for prioritization or if small enough
-        # We need a list for _prioritize_logs because it uses indices and multiple passes
-        deduplicated = []
-        for i, log in enumerate(deduplicated_gen):
-            deduplicated.append(log)
-            # If we are already under the limit and only have a few more, we might still want to list it
-            # But the logic below will handle it.
+        # Consume generator and store in list for multi-pass prioritization
+        deduplicated = list(gen_deduplicate(filtered))
 
         if len(deduplicated) <= self.max_output_lines:
             return deduplicated
