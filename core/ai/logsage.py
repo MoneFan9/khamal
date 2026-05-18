@@ -90,40 +90,33 @@ class LogSagePreprocessor:
             if i not in selected_indices:
                 selected_indices.add(i)
 
-    def _prioritize_logs(self, logs: List[str]) -> List[str]:
+    def _get_scored_indices(self, logs: List[str]) -> List[tuple[float, int]]:
         """
-        Implementation of the Multi-Phase Prioritization Strategy (MPPS).
-
-        This algorithm ensures that local LLMs receive the most semantically dense
-        information within their context window limit (max_output_lines).
-
-        Strategy:
-        1. Anchors: First, we identify "Ground Zero" lines—those with high severity
-           scores (>= 80). These are the definitive error messages.
-        2. Proximity: We expand the selection around each anchor by 'context_window' lines.
-           This captures the stack trace leading to the error, which is often more
-           valuable for the AI than the error message itself.
-        3. Recency-Weighted Relevance: If space remains, we fill it with other logs.
-           We use a hybrid score: Severity + (Index / Total) * 10. This ensures that
-           late-occurring warnings take precedence over early-occurring ones.
+        Returns a list of (score, index) tuples, sorted by score descending.
+        Hybrid score: Severity + (Index / Total) * 10 (recency weight).
         """
-        total_logs = len(logs)
-        if total_logs == 0:
-            return []
-
-        scored_indices = sorted(
+        total = len(logs)
+        return sorted(
             [
-                (self.get_severity_score(log) + (i / total_logs) * 10, i)
+                (self.get_severity_score(log) + (i / total) * 10, i)
                 for i, log in enumerate(logs)
             ],
             key=lambda x: x[0],
             reverse=True
         )
 
+    def _prioritize_logs(self, logs: List[str]) -> List[str]:
+        """
+        Implementation of the Multi-Phase Prioritization Strategy (MPPS).
+        """
+        if not logs:
+            return []
+
+        scored_indices = self._get_scored_indices(logs)
         selected_indices = set()
 
         self._add_anchors(scored_indices, selected_indices)
-        self._add_context_window(scored_indices, selected_indices, total_logs)
+        self._add_context_window(scored_indices, selected_indices, len(logs))
         self._fill_remaining_quota(scored_indices, selected_indices)
 
         # Re-sort chronologically
@@ -137,11 +130,10 @@ class LogSagePreprocessor:
         if not raw_logs:
             return []
 
-        # Use generator expressions to reduce memory overhead
+        # Step 1: Pre-filter and deduplicate using generators
         lines = (line.strip() for line in raw_logs.splitlines() if line.strip())
         filtered = (line for line in lines if not self.is_noise(line))
 
-        # Deduplicate using a generator-friendly approach
         def gen_deduplicate(iterable):
             prev = None
             for item in iterable:
@@ -151,13 +143,9 @@ class LogSagePreprocessor:
 
         deduplicated_gen = gen_deduplicate(filtered)
 
-        # Convert to list only when necessary for prioritization or if small enough
-        # We need a list for _prioritize_logs because it uses indices and multiple passes
-        deduplicated = []
-        for i, log in enumerate(deduplicated_gen):
-            deduplicated.append(log)
-            # If we are already under the limit and only have a few more, we might still want to list it
-            # But the logic below will handle it.
+        # Step 2: Consume generator into a list
+        # Optimization: We only need to process further if we exceed max_output_lines
+        deduplicated = list(deduplicated_gen)
 
         if len(deduplicated) <= self.max_output_lines:
             return deduplicated
