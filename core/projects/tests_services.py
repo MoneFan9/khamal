@@ -11,7 +11,8 @@ from .services import (
     remove_container, get_deployment_logs,
     provision_database,
     auto_provision_from_plan,
-    create_deployment_container
+    create_deployment_container,
+    _get_traefik_config
 )
 from django.contrib.auth import get_user_model
 
@@ -452,3 +453,26 @@ class ProvisioningServiceTest(TestCase):
         auto_provision_from_plan(self.project, plan)
 
         self.assertEqual(mock_provision.call_count, 2)
+
+class TraefikConfigTest(TestCase):
+    def test_get_traefik_config_no_ssl(self):
+        from django.test import override_settings
+        with override_settings(KHAMAL_SSL_ENABLED=False):
+            command, volumes = _get_traefik_config()
+            self.assertNotIn("--certificatesresolvers.le.acme.email=None", command)
+            self.assertIn("--entrypoints.web.address=:80", command)
+            self.assertNotIn('khamal-letsencrypt', volumes)
+
+    def test_get_traefik_config_with_ssl(self):
+        from django.test import override_settings
+        with override_settings(
+            KHAMAL_SSL_ENABLED=True,
+            KHAMAL_ACME_EMAIL="test@example.com",
+            KHAMAL_ACME_STORAGE="/letsencrypt/acme.json",
+            KHAMAL_ACME_CA_SERVER="https://acme-v02.api.letsencrypt.org/directory"
+        ):
+            command, volumes = _get_traefik_config()
+            self.assertIn("--certificatesresolvers.le.acme.email=test@example.com", command)
+            self.assertIn("--certificatesresolvers.le.acme.storage=/letsencrypt/acme.json", command)
+            self.assertIn("--entrypoints.web.http.redirections.entryPoint.to=websecure", command)
+            self.assertIn('khamal-letsencrypt', volumes)
