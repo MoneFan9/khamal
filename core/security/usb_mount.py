@@ -65,9 +65,17 @@ class USBMountManager:
         """
         # --- Security Hardening Protocol ---
         # 1. Path Normalization & Validation
-        is_valid, device_path, mount_point = USBMountManager._validate_paths(device_path, mount_point)
+        is_valid, device_path, normalized_mount = USBMountManager._validate_paths(device_path, mount_point)
         if not is_valid:
             return False
+
+        # 2. Block Device Verification
+        if not Path(device_path).is_block_device():
+            logger.error(f"Device path is not a block device: {device_path}")
+            return False
+
+        # 3. Secure Mounting Environment
+        # (Reserved for future SELinux/AppArmor context enforcement)
 
         # 4. Integrate with USBGuard
         if not USBGuardManager.is_installed():
@@ -105,7 +113,7 @@ class USBMountManager:
              logger.error(f"Device {device_path} is not authorized by USBGuard.")
              return False
 
-        if not os.path.exists(mount_point):
+        if not os.path.exists(normalized_mount):
             try:
                 os.makedirs(normalized_mount, exist_ok=True)
             except OSError as e:
