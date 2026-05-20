@@ -1,17 +1,9 @@
 import docker
 from django.conf import settings
 
-class HardenedContainerCollection:
+class HardenedBaseCollection:
     def __init__(self, collection):
         self._collection = collection
-
-    def run(self, *args, **kwargs):
-        self._check_security_params(kwargs)
-        return self._collection.run(*args, **kwargs)
-
-    def create(self, *args, **kwargs):
-        self._check_security_params(kwargs)
-        return self._collection.create(*args, **kwargs)
 
     def _check_security_params(self, params):
         forbidden_params = {
@@ -32,14 +24,38 @@ class HardenedContainerCollection:
         _recursive_check(params)
 
     def __getattribute__(self, name):
-        if name in ['_collection', 'run', 'create', '_check_security_params']:
+        if name in ['_collection', 'api']:
+             raise PermissionError(f"Security Policy Violation: Direct access to low-level Docker collection '{name}' is restricted.")
+        if name in ['_check_security_params'] or name.startswith('__'):
             return super().__getattribute__(name)
-        return getattr(self._collection, name)
+
+        attr = getattr(object.__getattribute__(self, '_collection'), name)
+        if callable(attr) and name in ['run', 'create', 'pull', 'build']:
+            def wrapped(*args, **kwargs):
+                self._check_security_params(kwargs)
+                return attr(*args, **kwargs)
+            return wrapped
+        return attr
+
+class HardenedContainerCollection(HardenedBaseCollection):
+    pass
+
+class HardenedImageCollection(HardenedBaseCollection):
+    pass
+
+class HardenedVolumeCollection(HardenedBaseCollection):
+    pass
+
+class HardenedNetworkCollection(HardenedBaseCollection):
+    pass
 
 class HardenedDockerClient:
     def __init__(self, client):
         self._client = client
         self.containers = HardenedContainerCollection(client.containers)
+        self.images = HardenedImageCollection(client.images)
+        self.volumes = HardenedVolumeCollection(client.volumes)
+        self.networks = HardenedNetworkCollection(client.networks)
 
     def __getattribute__(self, name):
         if name in ['api', '_client']:
@@ -47,7 +63,9 @@ class HardenedDockerClient:
         return super().__getattribute__(name)
 
     def __getattr__(self, name):
-        return getattr(self._client, name)
+        if name in ['api', '_client']:
+             raise PermissionError(f"Security Policy Violation: Direct access to low-level Docker API '{name}' is restricted.")
+        return getattr(object.__getattribute__(self, '_client'), name)
 
 def get_docker_client():
     """
