@@ -14,6 +14,11 @@ class HardenedContainerCollection:
         return self._collection.create(*args, **kwargs)
 
     def _check_security_params(self, params):
+        """
+        Enforces the 'No-Escalation' policy by recursively checking for forbidden
+        Docker parameters. This is the primary defense against container escape
+        via orchestrated deployments.
+        """
         forbidden_params = {
             'privileged', 'cap_add', 'security_opt', 'userns_mode',
             'pid_mode', 'group_add', 'oom_kill_disable', 'devices',
@@ -32,6 +37,11 @@ class HardenedContainerCollection:
         _recursive_check(params)
 
     def __getattribute__(self, name):
+        """
+        Custom attribute delegation to ensure that calls to 'run' or 'create'
+        always pass through our security filters, while other attributes
+        are delegated to the underlying Docker SDK collection.
+        """
         if name in ['_collection', 'run', 'create', '_check_security_params']:
             return super().__getattribute__(name)
         return getattr(self._collection, name)

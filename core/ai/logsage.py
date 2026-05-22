@@ -95,17 +95,22 @@ class LogSagePreprocessor:
         Implementation of the Multi-Phase Prioritization Strategy (MPPS).
 
         This algorithm ensures that local LLMs receive the most semantically dense
-        information within their context window limit (max_output_lines).
+        information within their context window limit (max_output_lines). Local models
+        like Llama 3 or Qwen 2.5 have finite context windows; MPPS optimizes for SNR
+        (Signal-to-Noise Ratio).
 
-        Strategy:
-        1. Anchors: First, we identify "Ground Zero" lines—those with high severity
-           scores (>= 80). These are the definitive error messages.
-        2. Proximity: We expand the selection around each anchor by 'context_window' lines.
-           This captures the stack trace leading to the error, which is often more
-           valuable for the AI than the error message itself.
-        3. Recency-Weighted Relevance: If space remains, we fill it with other logs.
-           We use a hybrid score: Severity + (Index / Total) * 10. This ensures that
-           late-occurring warnings take precedence over early-occurring ones.
+        Strategy Phases:
+        1. **Phase 1: Anchors (Ground Zero)**
+           Identify lines with severity >= 80 (CRITICAL, ERROR, FATAL, EXCEPTION).
+           These are guaranteed to be included if space allows.
+        2. **Phase 2: Proximity (Contextual Awareness)**
+           Expand selection by `self.context_window` around each anchor. This captures
+           the stack trace or the immediate state of the application before/after the crash.
+           AI models need this context to understand the *reason* for the anchor.
+        3. **Phase 3: Recency-Weighted Relevance (Hybrid Fill)**
+           Fill remaining quota using a score: `Severity + (Index / Total) * 10`.
+           The weighting ensures that a WARNING near the end of the log (likely closer
+           to the actual crash event) is prioritized over an earlier WARNING.
         """
         total_logs = len(logs)
         if total_logs == 0:
