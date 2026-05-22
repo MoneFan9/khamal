@@ -18,19 +18,17 @@ echo "----------------------------------"
 # 1. Prerequisite Checks
 echo -e "${BLUE}🔍 Checking prerequisites...${NC}"
 
-if ! command -v docker &> /dev/null; then
-    echo -e "${RED}❌ Docker is not installed. Please install Docker and try again.${NC}"
-    exit 1
-fi
+PREREQS=("docker" "python3" "git" "curl")
+for cmd in "${PREREQS[@]}"; do
+    if ! command -v "$cmd" &> /dev/null; then
+        echo -e "${RED}❌ $cmd is not installed. Please install $cmd and try again.${NC}"
+        exit 1
+    fi
+done
 
 # Check if Docker daemon is running
 if ! docker info &> /dev/null; then
     echo -e "${RED}❌ Docker daemon is not running. Please start Docker and try again.${NC}"
-    exit 1
-fi
-
-if ! command -v python3 &> /dev/null; then
-    echo -e "${RED}❌ Python 3 is not installed. Please install Python 3 and try again.${NC}"
     exit 1
 fi
 
@@ -124,11 +122,29 @@ if ! docker ps --filter "name=docker-socket-proxy" --quiet | grep -q . ; then
         -e POST=1 \
         -e DELETE=1 \
         tecnativa/docker-socket-proxy
+else
+    # Check if existing proxy is healthy (basic check)
+    if [ "$(docker inspect -f '{{.State.Running}}' docker-socket-proxy)" == "true" ]; then
+        echo -e "${GREEN}✅ docker-socket-proxy is already running.${NC}"
+    else
+        echo -e "${YELLOW}⚠️  docker-socket-proxy is present but not running. Restarting...${NC}"
+        docker start docker-socket-proxy
+    fi
 fi
 
 # Setup Traefik via management command
 echo "🌐 Setting up Traefik proxy..."
 python3 core/manage.py setup_traefik
+
+# 8. AI Readiness (Ollama)
+echo -e "${BLUE}🧠 Checking AI readiness (Ollama)...${NC}"
+if curl -s http://localhost:11434/api/tags &> /dev/null; then
+    echo -e "${GREEN}✅ Ollama detected. LogSage AI diagnostics will be available.${NC}"
+else
+    echo -e "${YELLOW}ℹ️  Ollama not detected on localhost:11434.${NC}"
+    echo "   To enable LogSage AI diagnostics, install Ollama (https://ollama.com) and pull a model:"
+    echo "   ollama pull qwen2.5-coder:7b"
+fi
 
 echo "----------------------------------"
 echo -e "${GREEN}✅ Khamal installation completed successfully!${NC}"
