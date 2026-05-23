@@ -50,3 +50,10 @@ class USBMountCoverageTests(TestCase):
         mock_makedirs.side_effect = OSError("Failed to create directory")
         result = USBMountManager.mount_volume("/dev/sdb1", "/mnt/usb/stick")
         self.assertFalse(result)
+
+    @patch("security.usb_mount.Path.is_block_device")
+    def test_mount_volume_not_block_device(self, mock_is_block):
+        mock_is_block.return_value = False
+        result = USBMountManager.mount_volume("/dev/sdb1", "/mnt/usb/stick")
+        self.assertFalse(result)
+        mock_is_block.assert_called_once()
