@@ -67,3 +67,11 @@ class TestChaosEngineering(unittest.TestCase):
     def test_syntax_error_scenario(self):
         scenario = ChaosGenerator.get_syntax_error()
         self._run_chaos_pipeline(scenario)
+
+    def test_missing_dependency_scenario(self):
+        scenario = ChaosGenerator.get_missing_dependency()
+        self._run_chaos_pipeline(scenario)
+
+    def test_missing_env_var_scenario(self):
+        scenario = ChaosGenerator.get_missing_env_var()
+        self._run_chaos_pipeline(scenario)

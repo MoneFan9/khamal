@@ -1,0 +1,30 @@
+name: Chaos Engineering Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  chaos-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r core/requirements.txt
+          pip install pytest pytest-django pytest-asyncio pytest-cov pytest-mock requests-mock djangorestframework django-environ docker GitPython
+
+      - name: Run Chaos Engineering Tests
+        run: |
+          export DJANGO_SETTINGS_MODULE=khamal.settings.development
+          export PYTHONPATH=core:pro:.
+          python3 -m pytest core/ai/tests_chaos_engineering.py
