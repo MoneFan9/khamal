@@ -76,3 +76,46 @@ SyntaxError: invalid syntax
             "fixed_block": "def list_items(request):",
             "rationale": "Missing colon after function definition in api/v1/endpoints.py."
         }
+
+    @staticmethod
+    def get_missing_dependency():
+        return {
+            "name": "Missing Dependency",
+            "logs": """
+Traceback (most recent call last):
+  File "app.py", line 1, in <module>
+    import requests
+ModuleNotFoundError: No module named 'requests'
+            """,
+            "project_context": {
+                "project_name": "Data-Fetcher",
+                "language": "Python",
+                "environment": "Development"
+            },
+            "broken_file": "requirements.txt",
+            "broken_content": "flask==3.0.0\npytest==8.0.0",
+            "fixed_content": "flask==3.0.0\npytest==8.0.0\nrequests==2.31.0",
+            "search_block": "pytest==8.0.0",
+            "fixed_block": "pytest==8.0.0\nrequests==2.31.0",
+            "rationale": "The 'requests' module is imported but not listed in requirements.txt."
+        }
+
+    @staticmethod
+    def get_missing_env_var():
+        return {
+            "name": "Missing Environment Variable",
+            "logs": """
+django.core.exceptions.ImproperlyConfigured: The SECRET_KEY setting must not be empty.
+            """,
+            "project_context": {
+                "project_name": "Secure-App",
+                "language": "Python/Django",
+                "environment": "Production"
+            },
+            "broken_file": ".env",
+            "broken_content": "DEBUG=False\nALLOWED_HOSTS=*",
+            "fixed_content": "DEBUG=False\nALLOWED_HOSTS=*\nSECRET_KEY=change-me-in-production",
+            "search_block": "ALLOWED_HOSTS=*",
+            "fixed_block": "ALLOWED_HOSTS=*\nSECRET_KEY=change-me-in-production",
+            "rationale": "The application requires SECRET_KEY to be set in the environment via .env file."
+        }
