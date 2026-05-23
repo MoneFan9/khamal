@@ -90,6 +90,18 @@ class LogSagePreprocessor:
             if i not in selected_indices:
                 selected_indices.add(i)
 
+    def _get_scored_indices(self, logs: List[str]) -> List[tuple]:
+        """Calculates and sorts log indices by severity and recency."""
+        total_logs = len(logs)
+        return sorted(
+            [
+                (self.get_severity_score(log) + (i / total_logs) * 10, i)
+                for i, log in enumerate(logs)
+            ],
+            key=lambda x: x[0],
+            reverse=True
+        )
+
     def _prioritize_logs(self, logs: List[str]) -> List[str]:
         """
         Implementation of the Multi-Phase Prioritization Strategy (MPPS).
@@ -111,15 +123,7 @@ class LogSagePreprocessor:
         if total_logs == 0:
             return []
 
-        scored_indices = sorted(
-            [
-                (self.get_severity_score(log) + (i / total_logs) * 10, i)
-                for i, log in enumerate(logs)
-            ],
-            key=lambda x: x[0],
-            reverse=True
-        )
-
+        scored_indices = self._get_scored_indices(logs)
         selected_indices = set()
 
         self._add_anchors(scored_indices, selected_indices)
@@ -153,11 +157,7 @@ class LogSagePreprocessor:
 
         # Convert to list only when necessary for prioritization or if small enough
         # We need a list for _prioritize_logs because it uses indices and multiple passes
-        deduplicated = []
-        for i, log in enumerate(deduplicated_gen):
-            deduplicated.append(log)
-            # If we are already under the limit and only have a few more, we might still want to list it
-            # But the logic below will handle it.
+        deduplicated = list(deduplicated_gen)
 
         if len(deduplicated) <= self.max_output_lines:
             return deduplicated
