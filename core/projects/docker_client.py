@@ -34,7 +34,7 @@ class HardenedContainerCollection:
     def __getattribute__(self, name):
         if name in ['_collection', 'run', 'create', '_check_security_params']:
             return super().__getattribute__(name)
-        return getattr(self._collection, name)
+        return getattr(object.__getattribute__(self, '_collection'), name)
 
 class HardenedDockerClient:
     def __init__(self, client):
@@ -47,7 +47,7 @@ class HardenedDockerClient:
         return super().__getattribute__(name)
 
     def __getattr__(self, name):
-        return getattr(self._client, name)
+        return getattr(object.__getattribute__(self, '_client'), name)
 
 def get_docker_client():
     """
