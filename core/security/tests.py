@@ -94,6 +94,40 @@ class USBMountTests(TestCase):
             check=True, capture_output=True, text=True
         )
 
+    @patch("security.usb_mount.USBGuardManager.is_installed")
+    @patch("security.usb_mount.USBGuardManager.is_service_active")
+    def test_mount_volume_service_not_active(self, mock_active, mock_installed):
+        mock_installed.return_value = True
+        mock_active.return_value = False
+        self.assertFalse(USBMountManager.mount_volume("/dev/sdb1", "/mnt/usb/stick"))
+
+    @patch("security.usb_mount.Path.is_block_device")
+    @patch("security.usb_mount.USBGuardManager.is_installed")
+    @patch("security.usb_mount.USBGuardManager.is_service_active")
+    @patch("security.usb_mount.USBGuardManager.list_devices")
+    def test_mount_volume_list_devices_failure(self, mock_list, mock_active, mock_installed, mock_block):
+        mock_installed.return_value = True
+        mock_active.return_value = True
+        mock_list.return_value = None
+        mock_block.return_value = True
+        self.assertFalse(USBMountManager.mount_volume("/dev/sdb1", "/mnt/usb/stick"))
+
+    @patch("security.usb_mount.Path.is_block_device")
+    @patch("security.usb_mount.USBGuardManager.is_installed")
+    @patch("security.usb_mount.USBGuardManager.is_service_active")
+    @patch("security.usb_mount.USBGuardManager.list_devices")
+    def test_mount_volume_not_authorized(self, mock_list, mock_active, mock_installed, mock_block):
+        mock_installed.return_value = True
+        mock_active.return_value = True
+        mock_list.return_value = "block /dev/sdb1"
+        mock_block.return_value = True
+        self.assertFalse(USBMountManager.mount_volume("/dev/sdb1", "/mnt/usb/stick"))
+
+    @patch("security.usb_mount.Path.is_block_device")
+    def test_mount_volume_not_block_device(self, mock_block):
+        mock_block.return_value = False
+        self.assertFalse(USBMountManager.mount_volume("/dev/sdb1", "/mnt/usb/stick"))
+
     @patch("security.usb_mount.Path.is_block_device")
     @patch("security.usb_mount.USBGuardManager.list_devices")
     @patch("security.usb_mount.USBGuardManager.is_service_active")
