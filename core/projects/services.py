@@ -86,36 +86,6 @@ def ensure_global_proxy():
             labels={"khamal.managed": "true"}
         )
 
-def _get_traefik_config() -> tuple[list[str], dict]:
-    """
-    Returns the command and volumes for the global Traefik container.
-    """
-    command = [
-        "--providers.docker=true",
-        "--providers.docker.exposedbydefault=false",
-        f"--providers.docker.network={PROXY_NETWORK_NAME}",
-        "--entrypoints.web.address=:80",
-        "--entrypoints.websecure.address=:443",
-    ]
-
-    volumes = {
-        '/var/run/docker.sock': {'bind': '/var/run/docker.sock', 'mode': 'ro'}
-    }
-
-    if settings.KHAMAL_SSL_ENABLED:
-        command.extend([
-            "--certificatesresolvers.le.acme.email=" + settings.KHAMAL_ACME_EMAIL,
-            "--certificatesresolvers.le.acme.storage=" + settings.KHAMAL_ACME_STORAGE,
-            "--certificatesresolvers.le.acme.tlschallenge=true",
-            "--certificatesresolvers.le.acme.caserver=" + settings.KHAMAL_ACME_CA_SERVER,
-            "--entrypoints.web.http.redirections.entryPoint.to=websecure",
-            "--entrypoints.web.http.redirections.entryPoint.scheme=https",
-        ])
-        # Persist certificates
-        volumes['khamal-letsencrypt'] = {'bind': '/letsencrypt', 'mode': 'rw'}
-
-    return command, volumes
-
 def ensure_project_network(project: Project) -> str:
     """
     Ensures an isolated bridge network exists for the project.
@@ -400,20 +370,28 @@ def _wait_for_healthy(container, timeout: int = 60):
         time.sleep(2)
     return False
 
-def _get_db_config(engine: str, project_id: int) -> tuple[dict, dict]:
+def _get_db_config(engine: str, project: Project) -> tuple[dict, dict]:
     """
     Returns the environment variables and volume mappings for the database engine.
     """
     environment = {}
     if engine == "postgres":
+        if not project.db_postgres_password:
+            project.db_postgres_password = secrets.token_urlsafe(16)
+            project.save(update_fields=['db_postgres_password'])
+
         environment = {
             "POSTGRES_DB": "khamal",
             "POSTGRES_USER": "khamal",
-            "POSTGRES_PASSWORD": secrets.token_urlsafe(16)
+            "POSTGRES_PASSWORD": project.db_postgres_password
         }
+    elif engine == "redis":
+        if not project.db_redis_password:
+            project.db_redis_password = secrets.token_urlsafe(16)
+            project.save(update_fields=['db_redis_password'])
 
     volumes = {
-        f"khamal-data-{engine}-{project_id}": {
+        f"khamal-data-{engine}-{project.id}": {
             "bind": "/var/lib/postgresql/data" if engine == "postgres" else "/data",
             "mode": "rw"
         }
@@ -431,6 +409,10 @@ def provision_database(project: Project, engine: str):
     container_name = f"khamal-db-{engine}-{project.id}"
     image = DATABASE_IMAGES.get(engine, f"{engine}:latest")
 
+    command = None
+    if engine == "redis":
+        command = f"redis-server --requirepass {project.db_redis_password}"
+
     try:
         container = client.containers.get(container_name)
         if container.status != "running":
@@ -440,7 +422,7 @@ def provision_database(project: Project, engine: str):
     except docker.errors.NotFound:
         logger.info(f"Provisioning new {engine} container: {container_name}")
 
-    environment, volumes = _get_db_config(engine, project.id)
+    environment, volumes = _get_db_config(engine, project)
 
     try:
         # SECURITY: Privileged mode and cap_add are strictly forbidden.
@@ -451,6 +433,7 @@ def provision_database(project: Project, engine: str):
             network=network_obj.name,
             environment=environment,
             volumes=volumes,
+            command=command,
             restart_policy={"Name": "always"},
             labels={
                 "khamal.managed": "true",
