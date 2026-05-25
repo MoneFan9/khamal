@@ -39,25 +39,34 @@ class LogConsumer(AsyncWebsocketConsumer):
 
             container = client.containers.get(container_id)
 
-            def get_log_stream():
-                return container.logs(stream=True, follow=True, tail=100, stdout=True, stderr=True)
+            # container.logs(stream=True) returns a blocking generator.
+            # We initialize it in a thread to be safe, although the call itself might not block
+            # until we start iterating.
+            log_stream = await asyncio.to_thread(
+                container.logs, stream=True, follow=True, tail=100, stdout=True, stderr=True
+            )
 
-            log_stream = await asyncio.to_thread(get_log_stream)
+            # container.logs can return a generator (on success) or a list (in some mock/edge cases).
+            # We ensure we have an iterator.
+            try:
+                log_iter = iter(log_stream)
+            except TypeError:
+                logger.error(f"log_stream is not iterable: {type(log_stream)}")
+                return
 
-            # Define a synchronous wrapper to get the next line from the blocking generator
-            def get_next_line(stream_iter):
-                try:
-                    return next(stream_iter)
-                except StopIteration:
-                    return None
-
-            stream_iter = iter(log_stream)
             while True:
                 if asyncio.current_task().cancelled():
                     break
 
-                # fetch the next line in a separate thread to avoid blocking the event loop
-                line = await asyncio.to_thread(get_next_line, stream_iter)
+                # Each call to next(log_iter) blocks until a new line is available.
+                # We offload each blocking call to a thread to keep the event loop responsive.
+                def get_next():
+                    try:
+                        return next(log_iter)
+                    except StopIteration:
+                        return None
+
+                line = await asyncio.to_thread(get_next)
                 if line is None:
                     break
 

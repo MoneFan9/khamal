@@ -80,7 +80,7 @@ Analyze the following preprocessed logs to perform a technical Root Cause Analys
         enable_tools: bool = False
     ):
         self.system_prompt = system_prompt or (self.TOOL_ENABLED_SYSTEM_PROMPT if enable_tools else self.SYSTEM_PROMPT)
-        self._rca_template = rca_template or self.RCA_TEMPLATE
+        self.rca_template = rca_template or self.RCA_TEMPLATE
         self.max_log_chars = max_log_chars
         self.enable_tools = enable_tools
 
@@ -121,7 +121,7 @@ Analyze the following preprocessed logs to perform a technical Root Cause Analys
         context = self._get_merged_context(project_context)
         formatted_logs = self._format_logs(logs)
 
-        user_content = self._rca_template.format(
+        user_content = self.rca_template.format(
             project_name=context["project_name"],
             language=context["language"],
             environment=context["environment"],
