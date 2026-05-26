@@ -8,7 +8,6 @@ class Server(models.Model):
     class Status(models.TextChoices):
         ONLINE = "ONLINE", "Online"
         OFFLINE = "OFFLINE", "Offline"
-        MAINTENANCE = "MAINTENANCE", "Maintenance"
         ERROR = "ERROR", "Error"
 
     name = models.CharField(max_length=255)
