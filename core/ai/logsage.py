@@ -61,104 +61,60 @@ class LogSagePreprocessor:
         """
         return [log for i, log in enumerate(logs) if i == 0 or log != logs[i-1]]
 
-    def _add_anchors(self, scored_indices: List[tuple], selected_indices: set):
-        """Phase 1: Add high-severity logs themselves first (anchors)."""
-        for score, i in scored_indices:
-            if score >= 80:
-                if len(selected_indices) < self.max_output_lines:
-                    selected_indices.add(i)
-            else:
-                break
-
-    def _add_context_window(self, scored_indices: List[tuple], selected_indices: set, total_logs: int):
-        """Phase 2: Add context window around high-severity logs."""
-        for score, i in scored_indices:
-            if score < 80:
-                break
-
-            context = range(max(0, i - self.context_window), min(total_logs, i + self.context_window + 1))
-            for j in context:
-                if len(selected_indices) >= self.max_output_lines:
-                    return
-                selected_indices.add(j)
-
-    def _fill_remaining_quota(self, scored_indices: List[tuple], selected_indices: set):
-        """Phase 3: Fill remaining space with other logs by priority."""
-        for _, i in scored_indices:
-            if len(selected_indices) >= self.max_output_lines:
-                break
-            if i not in selected_indices:
-                selected_indices.add(i)
-
-    def _prioritize_logs(self, logs: List[str]) -> List[str]:
-        """
-        Implementation of the Multi-Phase Prioritization Strategy (MPPS).
-
-        This algorithm ensures that local LLMs receive the most semantically dense
-        information within their context window limit (max_output_lines).
-
-        Strategy:
-        1. Anchors: First, we identify "Ground Zero" lines—those with high severity
-           scores (>= 80). These are the definitive error messages.
-        2. Proximity: We expand the selection around each anchor by 'context_window' lines.
-           This captures the stack trace leading to the error, which is often more
-           valuable for the AI than the error message itself.
-        3. Recency-Weighted Relevance: If space remains, we fill it with other logs.
-           We use a hybrid score: Severity + (Index / Total) * 10. This ensures that
-           late-occurring warnings take precedence over early-occurring ones.
-        """
-        total_logs = len(logs)
-        if total_logs == 0:
-            return []
-
-        scored_indices = sorted(
-            [
-                (self.get_severity_score(log) + (i / total_logs) * 10, i)
-                for i, log in enumerate(logs)
-            ],
+    def _get_scored_indices(self, logs: List[str]) -> List[tuple]:
+        """Returns indices sorted by priority score (severity + recency weight)."""
+        total = len(logs)
+        return sorted(
+            [(self.get_severity_score(log) + (i / total) * 10, i) for i, log in enumerate(logs)],
             key=lambda x: x[0],
             reverse=True
         )
 
-        selected_indices = set()
+    def _prioritize_logs(self, logs: List[str]) -> List[str]:
+        """
+        Implementation of the Multi-Phase Prioritization Strategy (MPPS).
+        Ensures local LLMs receive semantically dense information.
+        """
+        total_logs = len(logs)
+        if not total_logs: return []
 
-        self._add_anchors(scored_indices, selected_indices)
-        self._add_context_window(scored_indices, selected_indices, total_logs)
-        self._fill_remaining_quota(scored_indices, selected_indices)
+        scored_indices = self._get_scored_indices(logs)
+        selected = set()
 
-        # Re-sort chronologically
-        return [logs[i] for i in sorted(list(selected_indices))]
+        # Phase 1: Anchors (high severity) first
+        for score, i in scored_indices:
+            if score < 80 or len(selected) >= self.max_output_lines: break
+            selected.add(i)
+
+        # Phase 2: Add context window around anchors
+        if len(selected) < self.max_output_lines:
+            for score, i in scored_indices:
+                if score < 80: break
+                for j in range(max(0, i - self.context_window), min(total_logs, i + self.context_window + 1)):
+                    if len(selected) >= self.max_output_lines: break
+                    selected.add(j)
+
+        # Phase 3: Fill remaining quota with other logs by priority
+        for _, i in scored_indices:
+            if len(selected) >= self.max_output_lines: break
+            selected.add(i)
+
+        return [logs[i] for i in sorted(selected)]
 
     def process(self, raw_logs: str) -> List[str]:
-        """
-        Main algorithm: filters noise, deduplicates, and prioritizes critical errors.
-        Uses generators for memory efficiency.
-        """
-        if not raw_logs:
-            return []
+        """Filters noise, deduplicates, and prioritizes critical errors using MPPS."""
+        if not raw_logs: return []
 
-        # Use generator expressions to reduce memory overhead
-        lines = (line.strip() for line in raw_logs.splitlines() if line.strip())
-        filtered = (line for line in lines if not self.is_noise(line))
-
-        # Deduplicate using a generator-friendly approach
-        def gen_deduplicate(iterable):
+        # Stream filtering and deduplication
+        def clean_stream(logs_str):
             prev = None
-            for item in iterable:
-                if item != prev:
-                    yield item
-                prev = item
+            for line in logs_str.splitlines():
+                line = line.strip()
+                if line and line != prev and not self.is_noise(line):
+                    yield line
+                    prev = line
 
-        deduplicated_gen = gen_deduplicate(filtered)
-
-        # Convert to list only when necessary for prioritization or if small enough
-        # We need a list for _prioritize_logs because it uses indices and multiple passes
-        deduplicated = []
-        for i, log in enumerate(deduplicated_gen):
-            deduplicated.append(log)
-            # If we are already under the limit and only have a few more, we might still want to list it
-            # But the logic below will handle it.
-
+        deduplicated = list(clean_stream(raw_logs))
         if len(deduplicated) <= self.max_output_lines:
             return deduplicated
 
