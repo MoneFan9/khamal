@@ -70,7 +70,7 @@ class USBGuardTests(TestCase):
 
 class USBMountTests(TestCase):
 
-    @patch("security.usb_mount.Path.is_block_device")
+    @patch("security.usb_mount.USBMountManager.is_block_device")
     @patch("security.usb_mount.USBGuardManager.list_devices")
     @patch("security.usb_mount.USBGuardManager.is_service_active")
     @patch("security.usb_mount.USBGuardManager.is_installed")
@@ -94,7 +94,7 @@ class USBMountTests(TestCase):
             check=True, capture_output=True, text=True
         )
 
-    @patch("security.usb_mount.Path.is_block_device")
+    @patch("security.usb_mount.USBMountManager.is_block_device")
     @patch("security.usb_mount.USBGuardManager.list_devices")
     @patch("security.usb_mount.USBGuardManager.is_service_active")
     @patch("security.usb_mount.USBGuardManager.is_installed")
