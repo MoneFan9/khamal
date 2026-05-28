@@ -73,3 +73,46 @@ class SecurityHardeningTests(TestCase):
         args, kwargs = mock_run.call_args
         self.assertIn("-o", args[0])
         self.assertIn("noexec,nosuid,nodev", args[0])
+
+    @patch("security.usb_mount.Path.is_block_device")
+    @patch("security.usb_mount.USBGuardManager.list_devices")
+    @patch("security.usb_mount.USBGuardManager.is_service_active")
+    @patch("security.usb_mount.USBGuardManager.is_installed")
+    @patch("security.usb_mount.os.makedirs")
+    @patch("security.usb_mount.os.path.exists")
+    def test_mount_makedirs_failure(self, mock_exists, mock_makedirs, mock_installed, mock_active, mock_list, mock_block):
+        mock_installed.return_value = True
+        mock_active.return_value = True
+        mock_block.return_value = True
+        mock_list.return_value = "1: allow id 1234:5678 ... with-devpath \"/dev/sdb1\""
+        mock_exists.return_value = False
+        mock_makedirs.side_effect = OSError("Permission denied")
+
+        result = USBMountManager.mount_volume("/dev/sdb1", "/mnt/usb/stick")
+        self.assertFalse(result)
+        mock_makedirs.assert_called_once()
+
+    @patch("security.usb_mount.Path.is_block_device")
+    @patch("security.usb_mount.USBGuardManager.list_devices")
+    @patch("security.usb_mount.USBGuardManager.is_service_active")
+    @patch("security.usb_mount.USBGuardManager.is_installed")
+    @patch("security.usb_mount.subprocess.run")
+    @patch("security.usb_mount.os.path.exists")
+    def test_mount_command_failure(self, mock_exists, mock_run, mock_installed, mock_active, mock_list, mock_block):
+        mock_installed.return_value = True
+        mock_active.return_value = True
+        mock_block.return_value = True
+        mock_list.return_value = "1: allow id 1234:5678 ... with-devpath \"/dev/sdb1\""
+        mock_exists.return_value = True
+        mock_run.side_effect = subprocess.CalledProcessError(1, "mount", stderr="Generic error")
+
+        result = USBMountManager.mount_volume("/dev/sdb1", "/mnt/usb/stick")
+        self.assertFalse(result)
+        mock_run.assert_called_once()
+
+    @patch("security.usb_mount.subprocess.run")
+    def test_unmount_volume_failure(self, mock_run):
+        mock_run.side_effect = subprocess.CalledProcessError(1, "umount", stderr="Device busy")
+        result = USBMountManager.unmount_volume("/mnt/usb/stick")
+        self.assertFalse(result)
+        mock_run.assert_called_once()
