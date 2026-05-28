@@ -1,5 +1,6 @@
 import subprocess
 import logging
+import shutil
 
 logger = logging.getLogger(__name__)
 
@@ -11,11 +12,7 @@ class USBGuardManager:
     @staticmethod
     def is_installed():
         """Checks if usbguard is available in the system."""
-        try:
-            subprocess.run(["usbguard", "--version"], capture_output=True, check=True)
-            return True
-        except (subprocess.CalledProcessError, FileNotFoundError):
-            return False
+        return shutil.which("usbguard") is not None
 
     @staticmethod
     def is_service_active():

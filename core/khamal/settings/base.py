@@ -78,12 +78,15 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
-                "pro.white_label.context_processors.white_label",
                 "khamal.context_processors.pro_status",
             ],
         },
     },
 ]
+
+# Dynamically add Pro context processors if available
+if (BASE_DIR.parent / "pro").exists():
+    TEMPLATES[0]["OPTIONS"]["context_processors"].append("pro.white_label.context_processors.white_label")
 
 WSGI_APPLICATION = "khamal.wsgi.application"
 ASGI_APPLICATION = "khamal.asgi.application"
