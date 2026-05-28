@@ -7,7 +7,8 @@ from local.models import LocalSource
 from projects.services import (
     ensure_project_network, delete_project_network, start_container,
     stop_container, restart_container, remove_container, get_routing_labels,
-    _get_deployment_volumes, provision_database, _wait_for_healthy
+    _get_deployment_volumes, provision_database, _wait_for_healthy,
+    _get_traefik_config
 )
 import docker
 import time
@@ -269,3 +270,19 @@ class TestProjectsServicesExtended:
 
         with pytest.raises(Exception):
             provision_database(project, "postgres")
+
+    def test_get_traefik_config_no_ssl(self):
+        with patch.object(settings, "KHAMAL_SSL_ENABLED", False):
+            command, volumes = _get_traefik_config()
+            assert "--entrypoints.web.http.redirections.entryPoint.to=websecure" not in command
+            assert "khamal-letsencrypt" not in volumes
+
+    def test_get_traefik_config_ssl(self):
+        with patch.object(settings, "KHAMAL_SSL_ENABLED", True):
+            with patch.object(settings, "KHAMAL_ACME_EMAIL", "test@example.com"):
+                with patch.object(settings, "KHAMAL_ACME_STORAGE", "/letsencrypt/acme.json"):
+                    with patch.object(settings, "KHAMAL_ACME_CA_SERVER", "https://acme.com"):
+                        command, volumes = _get_traefik_config()
+                        assert "--certificatesresolvers.le.acme.email=test@example.com" in command
+                        assert "khamal-letsencrypt" in volumes
+                        assert volumes["khamal-letsencrypt"]["bind"] == "/letsencrypt"
