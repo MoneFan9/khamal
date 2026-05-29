@@ -37,10 +37,19 @@ fi
 if ! command -v nixpacks &> /dev/null; then
     echo -e "${YELLOW}⚠️  Nixpacks is not installed. It is required for building images.${NC}"
     echo "👉 Install it via: curl -sSL https://nixpacks.com/install.sh | bash"
+else
+    echo -e "${GREEN}✅ Nixpacks detected.${NC}"
+fi
+
+if ! command -v usbguard &> /dev/null; then
+    echo -e "${YELLOW}⚠️  USBGuard is not installed. Physical USB ingestion will be disabled.${NC}"
+    echo "👉 Install it via your package manager (e.g., apt install usbguard)."
+else
+    echo -e "${GREEN}✅ USBGuard detected.${NC}"
 fi
 
 # 2. Environment Setup
-echo -e "${BLUE}📁 Setting up environment...${NC}"
+echo -e "${BLUE}📁 [Phase 2/7] Setting up environment...${NC}"
 if [ ! -f .env ]; then
     echo "📝 Creating .env from .env.example..."
     cp core/.env.example .env
@@ -58,7 +67,7 @@ else
 fi
 
 # 3. Security Hardening (Hidden Admin)
-echo -e "${BLUE}🛡️  Configuring secure admin access...${NC}"
+echo -e "${BLUE}🛡️  [Phase 3/7] Configuring secure admin access...${NC}"
 python3 -c "
 import os
 import secrets
@@ -86,7 +95,7 @@ if update_env('SYSTEM_ADMIN_USERNAME', username):
 "
 
 # 4. Dependency Installation
-echo -e "${BLUE}📦 Installing dependencies...${NC}"
+echo -e "${BLUE}📦 [Phase 4/7] Installing dependencies...${NC}"
 if [ ! -d "venv" ]; then
     python3 -m venv venv
 fi
@@ -95,18 +104,18 @@ pip install --upgrade pip
 pip install -r core/requirements.txt
 
 # 5. Database Migrations
-echo -e "${BLUE}🗄️  Running database migrations...${NC}"
+echo -e "${BLUE}🗄️  [Phase 5/7] Running database migrations...${NC}"
 export PYTHONPATH=core:.
 python3 core/manage.py migrate
 
 # 6. Initialize System Admin
-echo -e "${BLUE}👤 Setting up system administrator...${NC}"
+echo -e "${BLUE}👤 [Phase 6/7] Setting up system administrator...${NC}"
 # Load from .env manually
 export $(grep -v '^#' .env | xargs)
 python3 core/manage.py create_system_admin
 
 # 7. Core Services Initialization
-echo -e "${BLUE}🚀 Initializing core services...${NC}"
+echo -e "${BLUE}🚀 [Phase 7/7] Initializing core services...${NC}"
 
 # Start docker-socket-proxy if not running (simple version for single-node)
 # Binds to 127.0.0.1 for security.

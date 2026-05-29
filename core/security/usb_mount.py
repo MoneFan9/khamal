@@ -2,6 +2,7 @@ import subprocess
 import logging
 import os
 import re
+import stat
 from pathlib import Path
 from .usb_guard import USBGuardManager
 
@@ -62,11 +63,27 @@ class USBMountManager:
 
         Returns:
             bool: True if successful, False otherwise.
+
+        Security Hardening Protocol (4-Step Verification):
+        1. Path Normalization: Prevents directory traversal and symlink attacks.
+        2. Block Device Verification: Ensures the source is a physical disk.
+        3. USBGuard Authorization: Validates hardware IDs against local policy.
+        4. No-Execution Mounting: Enforces 'noexec, nosuid, nodev' flags.
         """
         # --- Security Hardening Protocol ---
         # 1. Path Normalization & Validation
-        is_valid, device_path, mount_point = USBMountManager._validate_paths(device_path, mount_point)
+        is_valid, device_path, normalized_mount = USBMountManager._validate_paths(device_path, mount_point)
         if not is_valid:
+            return False
+
+        # 2. Block Device Verification
+        try:
+            mode = os.stat(device_path).st_mode
+            if not stat.S_ISBLK(mode):
+                logger.error(f"Device {device_path} is not a block device.")
+                return False
+        except OSError as e:
+            logger.error(f"Failed to stat device {device_path}: {e}")
             return False
 
         # 4. Integrate with USBGuard
@@ -105,7 +122,7 @@ class USBMountManager:
              logger.error(f"Device {device_path} is not authorized by USBGuard.")
              return False
 
-        if not os.path.exists(mount_point):
+        if not os.path.exists(normalized_mount):
             try:
                 os.makedirs(normalized_mount, exist_ok=True)
             except OSError as e:
