@@ -2,6 +2,14 @@ import docker
 from django.conf import settings
 
 class HardenedContainerCollection:
+    """
+    HardenedContainerCollection: A security proxy for Docker container operations.
+
+    This class wraps the standard Docker SDK collection to enforce Khamal's
+    "No-Escalation" policy. It intercepts 'run' and 'create' calls to prevent
+    the use of dangerous parameters that could lead to container escape or
+    host compromise.
+    """
     def __init__(self, collection):
         self._collection = collection
 
@@ -37,6 +45,16 @@ class HardenedContainerCollection:
         return getattr(self._collection, name)
 
 class HardenedDockerClient:
+    """
+    HardenedDockerClient: The primary entry point for secure Docker orchestration.
+
+    Architectural Pattern: Security Proxy.
+    Instead of exposing the raw Docker SDK client, Khamal uses this hardened wrapper.
+    It provides:
+    1. Attribute-level access control (blocking 'api' and internal '_client').
+    2. Deep inspection of container creation parameters.
+    3. Recursive security checks for nested configuration dictionaries.
+    """
     def __init__(self, client):
         self._client = client
         self.containers = HardenedContainerCollection(client.containers)

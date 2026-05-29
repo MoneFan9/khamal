@@ -95,17 +95,18 @@ class LogSagePreprocessor:
         Implementation of the Multi-Phase Prioritization Strategy (MPPS).
 
         This algorithm ensures that local LLMs receive the most semantically dense
-        information within their context window limit (max_output_lines).
+        information within their context window limit (max_output_lines). It solves
+        the "Needle in a Haystack" problem by surgically selecting the most
+        relevant context for troubleshooting.
 
-        Strategy:
-        1. Anchors: First, we identify "Ground Zero" lines—those with high severity
-           scores (>= 80). These are the definitive error messages.
-        2. Proximity: We expand the selection around each anchor by 'context_window' lines.
-           This captures the stack trace leading to the error, which is often more
-           valuable for the AI than the error message itself.
-        3. Recency-Weighted Relevance: If space remains, we fill it with other logs.
-           We use a hybrid score: Severity + (Index / Total) * 10. This ensures that
-           late-occurring warnings take precedence over early-occurring ones.
+        The strategy follows a 3-phase prioritization:
+        Phase 1: Anchors - Identifying 'Ground Zero' (Severity >= 80).
+        Phase 2: Context - Capturing 'Before/After' frames (stack traces).
+        Phase 3: Relevance - Filling remaining quota with weighted recent events.
+
+        Scoring Logic:
+        - Severity: Definitive importance (e.g., EXCEPTION=90, ERROR=80).
+        - Recency: (Index / Total) * 10. Newer events are slightly more relevant.
         """
         total_logs = len(logs)
         if total_logs == 0:
