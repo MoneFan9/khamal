@@ -1,3 +1,4 @@
+import stat
 import os
 from unittest.mock import patch, MagicMock
 from django.test import TestCase, override_settings
@@ -46,19 +47,19 @@ class SecurityHardeningTests(TestCase):
         self.assertFalse(serializer.is_valid())
         self.assertIn('host_path', serializer.errors)
 
-    @patch("security.usb_mount.Path.is_block_device")
+    @patch("security.usb_mount.os.stat")
     @patch("security.usb_mount.USBGuardManager.list_devices")
     @patch("security.usb_mount.USBGuardManager.is_service_active")
     @patch("security.usb_mount.USBGuardManager.is_installed")
     @patch("os.path.exists")
     @patch("os.makedirs")
     @patch("subprocess.run")
-    def test_usb_mount_valid(self, mock_run, mock_makedirs, mock_exists, mock_usbguard, mock_active, mock_list, mock_block):
+    def test_usb_mount_valid(self, mock_run, mock_makedirs, mock_exists, mock_usbguard, mock_active, mock_list, mock_stat):
         """Test USBMountManager with valid parameters and verify flags."""
         mock_usbguard.return_value = True
         mock_active.return_value = True
         mock_list.return_value = "allow /dev/sdb1"
-        mock_block.return_value = True
+        mock_stat_obj = MagicMock(); mock_stat_obj.st_mode = 24576; mock_stat.return_value = mock_stat_obj
         mock_exists.return_value = False
         mock_run.return_value = MagicMock(returncode=0)
 
