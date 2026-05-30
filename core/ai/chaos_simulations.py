@@ -76,3 +76,26 @@ SyntaxError: invalid syntax
             "fixed_block": "def list_items(request):",
             "rationale": "Missing colon after function definition in api/v1/endpoints.py."
         }
+
+    @staticmethod
+    def get_dependency_missing():
+        return {
+            "name": "Missing Dependency",
+            "logs": """
+Traceback (most recent call last):
+  File "main.py", line 2, in <module>
+    import requests
+ModuleNotFoundError: No module named 'requests'
+            """,
+            "project_context": {
+                "project_name": "Weather-App",
+                "language": "Python",
+                "environment": "Production"
+            },
+            "broken_file": "requirements.txt",
+            "broken_content": "django>=6.0.0\npsycopg2-binary>=2.9.0",
+            "fixed_content": "django>=6.0.0\npsycopg2-binary>=2.9.0\nrequests>=2.31.0",
+            "search_block": "psycopg2-binary>=2.9.0",
+            "fixed_block": "psycopg2-binary>=2.9.0\nrequests>=2.31.0",
+            "rationale": "The application fails because 'requests' is not listed in requirements.txt."
+        }
