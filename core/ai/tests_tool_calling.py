@@ -39,5 +39,3 @@ class TestToolCalling(unittest.TestCase):
         self.assertIn("rationale", tools[0]["function"]["parameters"]["required"])
         self.assertIn("changes", tools[0]["function"]["parameters"]["required"])
 
-if __name__ == "__main__":
-    unittest.main()
