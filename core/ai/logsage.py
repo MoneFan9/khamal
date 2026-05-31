@@ -153,11 +153,7 @@ class LogSagePreprocessor:
 
         # Convert to list only when necessary for prioritization or if small enough
         # We need a list for _prioritize_logs because it uses indices and multiple passes
-        deduplicated = []
-        for i, log in enumerate(deduplicated_gen):
-            deduplicated.append(log)
-            # If we are already under the limit and only have a few more, we might still want to list it
-            # But the logic below will handle it.
+        deduplicated = list(deduplicated_gen)
 
         if len(deduplicated) <= self.max_output_lines:
             return deduplicated
