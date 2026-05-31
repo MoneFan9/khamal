@@ -13,8 +13,3 @@ class ServerSerializer(serializers.ModelSerializer):
             'id', 'status', 'os_info', 'cpu_cores',
             'memory_total', 'last_heartbeat', 'created_at', 'updated_at'
         ]
-
-    def validate_ssh_port(self, value):
-        if value < 1 or value > 65535:
-            raise serializers.ValidationError("Port must be between 1 and 65535.")
-        return value

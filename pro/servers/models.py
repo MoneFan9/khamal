@@ -1,5 +1,5 @@
 from django.db import models
-from django.core.validators import MinValueValidator
+from django.core.validators import MinValueValidator, MaxValueValidator
 
 class Server(models.Model):
     """
@@ -8,12 +8,14 @@ class Server(models.Model):
     class Status(models.TextChoices):
         ONLINE = "ONLINE", "Online"
         OFFLINE = "OFFLINE", "Offline"
-        MAINTENANCE = "MAINTENANCE", "Maintenance"
         ERROR = "ERROR", "Error"
 
     name = models.CharField(max_length=255)
     hostname_or_ip = models.CharField(max_length=255, unique=True)
-    ssh_port = models.PositiveIntegerField(default=22)
+    ssh_port = models.PositiveIntegerField(
+        default=22,
+        validators=[MinValueValidator(1), MaxValueValidator(65535)]
+    )
 
     status = models.CharField(
         max_length=20,
