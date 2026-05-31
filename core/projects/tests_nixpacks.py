@@ -69,6 +69,16 @@ class NixpacksServiceTest(IsolatedAsyncioTestCase):
 
         self.assertIn("Plan error", str(cm.exception))
 
+    @patch('asyncio.create_subprocess_exec')
+    async def test_unexpected_error(self, mock_exec):
+        # Mock unexpected exception
+        mock_exec.side_effect = RuntimeError("Something went wrong")
+
+        with self.assertRaises(NixpacksError) as cm:
+            await plan_build("/path/to/source")
+
+        self.assertIn("Unexpected error: Something went wrong", str(cm.exception))
+
 class NixpacksParserTest(IsolatedAsyncioTestCase):
     def test_parse_valid_plan(self):
         plan_json = json.dumps({
