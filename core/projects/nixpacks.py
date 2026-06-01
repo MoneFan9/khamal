@@ -1,4 +1,5 @@
 import asyncio
+import os
 import json
 import logging
 from dataclasses import dataclass, field
@@ -94,7 +95,8 @@ async def _run_nixpacks_command(cmd: List[str], error_prefix: str) -> str:
         process = await asyncio.create_subprocess_exec(
             *cmd,
             stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
+            stderr=asyncio.subprocess.PIPE,
+            env=os.environ | {"DOCKER_BUILDKIT": "1"}
         )
 
         stdout, stderr = await process.communicate()

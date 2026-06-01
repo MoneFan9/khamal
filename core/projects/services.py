@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 PROXY_NETWORK_NAME = "khamal-proxy"
 TRAEFIK_CONTAINER_NAME = "khamal-traefik"
-TRAEFIK_IMAGE = "traefik:v3.1"
+TRAEFIK_IMAGE = "traefik:v3.1-alpine"
 
 DATABASE_IMAGES = {
     "postgres": "postgres:16-alpine",

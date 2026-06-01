@@ -27,6 +27,10 @@ class NixpacksServiceTest(IsolatedAsyncioTestCase):
         self.assertIn("--env", args)
         self.assertIn("KEY=VALUE", args)
 
+        # Verify BuildKit is enabled in env
+        _, kwargs = mock_exec.call_args
+        self.assertEqual(kwargs['env'].get('DOCKER_BUILDKIT'), '1')
+
     @patch('asyncio.create_subprocess_exec')
     async def test_build_image_failure(self, mock_exec):
         # Mock process failure
