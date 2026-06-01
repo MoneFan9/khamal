@@ -5,7 +5,9 @@ nixPkgs = ["python3", "nodejs"]
 cacheDirectories = [
   "node_modules",
   "/root/.cache/pip",
-  "/root/.cache/npm"
+  "/root/.cache/npm",
+  "/root/.cache/pnpm",
+  "/root/.cache/yarn"
 ]
 
 [phases.build]
@@ -13,5 +15,7 @@ cacheDirectories = [
   "node_modules",
   ".next/cache",
   "/root/.cache/pip",
-  "/root/.cache/npm"
+  "/root/.cache/npm",
+  "/root/.cache/pnpm",
+  "/root/.cache/yarn"
 ]
