@@ -137,7 +137,8 @@ class LogSagePreprocessor:
         if not raw_logs:
             return []
 
-        # Use generator expressions to reduce memory overhead
+        # 1. Use generator expressions to reduce memory overhead
+        # splitlines(keepends=False) is generally more efficient than manual strip
         lines = (line.strip() for line in raw_logs.splitlines() if line.strip())
         filtered = (line for line in lines if not self.is_noise(line))
 
@@ -151,13 +152,10 @@ class LogSagePreprocessor:
 
         deduplicated_gen = gen_deduplicate(filtered)
 
-        # Convert to list only when necessary for prioritization or if small enough
-        # We need a list for _prioritize_logs because it uses indices and multiple passes
-        deduplicated = []
-        for i, log in enumerate(deduplicated_gen):
-            deduplicated.append(log)
-            # If we are already under the limit and only have a few more, we might still want to list it
-            # But the logic below will handle it.
+        # 2. Heuristic: If we expect many logs, we still need to collect them
+        # to perform prioritization (which requires total count and multiple passes).
+        # However, we only do this once.
+        deduplicated = list(deduplicated_gen)
 
         if len(deduplicated) <= self.max_output_lines:
             return deduplicated

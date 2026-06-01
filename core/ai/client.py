@@ -93,6 +93,9 @@ class OllamaClient:
             "model": model,
             "keep_alive": 0
         }
+        # Ollama documentation recommends sending an empty request with keep_alive: 0
+        # to either /generate or /chat to unload a specific model.
+        # We try /generate as it is the standard for unloading.
         response = requests.post(f"{self.api_url}/generate", json=payload)
         response.raise_for_status()
         return response.json()
