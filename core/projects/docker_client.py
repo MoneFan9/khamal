@@ -37,6 +37,18 @@ class HardenedContainerCollection:
         return getattr(self._collection, name)
 
 class HardenedDockerClient:
+    """
+    Hardened Docker Client Proxy.
+
+    Architectural Security Note:
+    This proxy enforces the "No-Escalation" policy by blocking dangerous parameters
+    at the SDK level before they even reach the Docker API.
+    1. Forbidden Parameters: Specifically blocks 'privileged=True' and 'cap_add'.
+    2. Recursive Protection: All collections (containers, networks) are wrapped
+       to ensure that nested objects also inherit security restrictions.
+    3. Low-level Access Blocking: Direct access to the underlying 'api' object
+       is forbidden to prevent proxy bypass.
+    """
     def __init__(self, client):
         self._client = client
         self.containers = HardenedContainerCollection(client.containers)
