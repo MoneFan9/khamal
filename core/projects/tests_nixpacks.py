@@ -162,3 +162,14 @@ class NixpacksDetectionTest(TestCase):
         # Substring match
         plan = NixpacksPlan(packages=["redis-server"])
         self.assertTrue(plan.has_redis)
+
+class NixpacksUnexpectedErrorTest(IsolatedAsyncioTestCase):
+    @patch('asyncio.create_subprocess_exec')
+    async def test_run_command_unexpected_exception(self, mock_exec):
+        # Mocking an unexpected exception like OSError (e.g. command not found)
+        mock_exec.side_effect = OSError("Internal failure")
+
+        with self.assertRaises(NixpacksError) as cm:
+            await build_image("/path/to/source")
+
+        self.assertIn("Unexpected error: Internal failure", str(cm.exception))
