@@ -1,3 +1,4 @@
+from django.conf import settings
 import unittest
 import tempfile
 import shutil
@@ -22,7 +23,7 @@ class TestOllamaClient(unittest.TestCase):
         self.assertEqual(result["response"], "Hello world")
         mock_post.assert_called_once_with(
             "http://ollama-test:11434/api/generate",
-            json={"model": "llama3", "prompt": "Hi", "stream": False, "keep_alive": "5m"}
+            json={"model": "llama3", "prompt": "Hi", "stream": False, "keep_alive": settings.OLLAMA_KEEP_ALIVE}
         )
 
     @patch("requests.post")
@@ -38,7 +39,7 @@ class TestOllamaClient(unittest.TestCase):
         self.assertEqual(result["message"]["content"], "Hi there!")
         mock_post.assert_called_once_with(
             "http://ollama-test:11434/api/chat",
-            json={"model": "llama3", "messages": messages, "stream": False, "keep_alive": "5m"}
+            json={"model": "llama3", "messages": messages, "stream": False, "keep_alive": settings.OLLAMA_KEEP_ALIVE}
         )
 
     @patch("requests.get")
@@ -144,7 +145,7 @@ class TestOllamaClient(unittest.TestCase):
                 "stream": False,
                 "tools": tools,
                 "options": {"temperature": 0.5},
-                "keep_alive": "5m"
+                "keep_alive": settings.OLLAMA_KEEP_ALIVE
             }
         )
 
@@ -185,7 +186,7 @@ class TestOllamaClient(unittest.TestCase):
                 "template": "template",
                 "context": [1, 2, 3],
                 "options": {"num_predict": 10},
-                "keep_alive": "5m"
+                "keep_alive": settings.OLLAMA_KEEP_ALIVE
             }
         )
 
