@@ -1,11 +1,11 @@
-from django.test import TestCase
-from unittest import IsolatedAsyncioTestCase
-from unittest.mock import patch, MagicMock, AsyncMock
+import pytest
 import json
+from unittest.mock import patch, MagicMock, AsyncMock
 from .nixpacks import build_image, plan_build, NixpacksError, parse_nixpacks_plan, NixpacksPlan
 
-class NixpacksServiceTest(IsolatedAsyncioTestCase):
+class TestNixpacksService:
 
+    @pytest.mark.asyncio
     @patch('asyncio.create_subprocess_exec')
     async def test_build_image_success(self, mock_exec):
         # Mock process
@@ -16,17 +16,18 @@ class NixpacksServiceTest(IsolatedAsyncioTestCase):
 
         result = await build_image("/path/to/source", image_name="test-image", envs={"KEY": "VALUE"})
 
-        self.assertEqual(result, "Build success")
+        assert result == "Build success"
         mock_exec.assert_called_once()
         args, _ = mock_exec.call_args
-        self.assertIn("nixpacks", args)
-        self.assertIn("build", args)
-        self.assertIn("/path/to/source", args)
-        self.assertIn("--name", args)
-        self.assertIn("test-image", args)
-        self.assertIn("--env", args)
-        self.assertIn("KEY=VALUE", args)
+        assert "nixpacks" in args
+        assert "build" in args
+        assert "/path/to/source" in args
+        assert "--name" in args
+        assert "test-image" in args
+        assert "--env" in args
+        assert "KEY=VALUE" in args
 
+    @pytest.mark.asyncio
     @patch('asyncio.create_subprocess_exec')
     async def test_build_image_failure(self, mock_exec):
         # Mock process failure
@@ -35,11 +36,11 @@ class NixpacksServiceTest(IsolatedAsyncioTestCase):
         mock_process.returncode = 1
         mock_exec.return_value = mock_process
 
-        with self.assertRaises(NixpacksError) as cm:
+        with pytest.raises(NixpacksError) as excinfo:
             await build_image("/path/to/source")
+        assert "Build error" in str(excinfo.value)
 
-        self.assertIn("Build error", str(cm.exception))
-
+    @pytest.mark.asyncio
     @patch('asyncio.create_subprocess_exec')
     async def test_plan_build_success(self, mock_exec):
         # Mock process
@@ -50,12 +51,13 @@ class NixpacksServiceTest(IsolatedAsyncioTestCase):
 
         result = await plan_build("/path/to/source", envs={"DEBUG": "1"})
 
-        self.assertEqual(result, '{"plan": "json"}')
+        assert result == '{"plan": "json"}'
         mock_exec.assert_called_once()
         args, _ = mock_exec.call_args
-        self.assertIn("plan", args)
-        self.assertIn("DEBUG=1", args)
+        assert "plan" in args
+        assert "DEBUG=1" in args
 
+    @pytest.mark.asyncio
     @patch('asyncio.create_subprocess_exec')
     async def test_plan_build_failure(self, mock_exec):
         # Mock process failure
@@ -64,12 +66,20 @@ class NixpacksServiceTest(IsolatedAsyncioTestCase):
         mock_process.returncode = 1
         mock_exec.return_value = mock_process
 
-        with self.assertRaises(NixpacksError) as cm:
+        with pytest.raises(NixpacksError) as excinfo:
             await plan_build("/path/to/source")
+        assert "Plan error" in str(excinfo.value)
 
-        self.assertIn("Plan error", str(cm.exception))
+    @pytest.mark.asyncio
+    @patch('asyncio.create_subprocess_exec')
+    async def test_run_nixpacks_command_unexpected_exception(self, mock_exec):
+        mock_exec.side_effect = Exception("Spawn failed")
+        from .nixpacks import _run_nixpacks_command
+        with pytest.raises(NixpacksError) as excinfo:
+            await _run_nixpacks_command(["nixpacks", "build", "."], "Nixpacks build")
+        assert "Unexpected error" in str(excinfo.value)
 
-class NixpacksParserTest(IsolatedAsyncioTestCase):
+class TestNixpacksParser:
     def test_parse_valid_plan(self):
         plan_json = json.dumps({
             "providers": ["python"],
@@ -97,27 +107,27 @@ class NixpacksParserTest(IsolatedAsyncioTestCase):
 
         plan = parse_nixpacks_plan(plan_json)
 
-        self.assertIsInstance(plan, NixpacksPlan)
-        self.assertEqual(plan.providers, ["python"])
-        self.assertEqual(plan.packages, ["python311", "gcc"])
-        self.assertEqual(plan.libraries, ["libpq"])
-        self.assertEqual(plan.apt_packages, ["libssl-dev"])
-        self.assertEqual(plan.install_cmds, ["pip install -r requirements.txt", "pip install ."])
-        self.assertEqual(plan.build_cmds, ["python manage.py collectstatic"])
-        self.assertEqual(plan.start_cmd, "gunicorn khamal.wsgi")
-        self.assertEqual(plan.variables, {"DJANGO_SETTINGS_MODULE": "khamal.settings.production", "PORT": "8000"})
+        assert isinstance(plan, NixpacksPlan)
+        assert plan.providers == ["python"]
+        assert plan.packages == ["python311", "gcc"]
+        assert plan.libraries == ["libpq"]
+        assert plan.apt_packages == ["libssl-dev"]
+        assert plan.install_cmds == ["pip install -r requirements.txt", "pip install ."]
+        assert plan.build_cmds == ["python manage.py collectstatic"]
+        assert plan.start_cmd == "gunicorn khamal.wsgi"
+        assert plan.variables == {"DJANGO_SETTINGS_MODULE": "khamal.settings.production", "PORT": "8000"}
 
     def test_parse_minimal_plan(self):
         plan_json = json.dumps({})
         plan = parse_nixpacks_plan(plan_json)
 
-        self.assertEqual(plan.providers, [])
-        self.assertEqual(plan.packages, [])
-        self.assertEqual(plan.install_cmds, [])
-        self.assertEqual(plan.start_cmd, None)
+        assert plan.providers == []
+        assert plan.packages == []
+        assert plan.install_cmds == []
+        assert plan.start_cmd is None
 
     def test_parse_invalid_json(self):
-        with self.assertRaises(NixpacksError):
+        with pytest.raises(NixpacksError):
             parse_nixpacks_plan("invalid json")
 
     def test_type_guards(self):
@@ -132,33 +142,33 @@ class NixpacksParserTest(IsolatedAsyncioTestCase):
             "variables": "not a dict"
         })
         plan = parse_nixpacks_plan(plan_json)
-        self.assertEqual(plan.providers, [])
-        self.assertEqual(plan.packages, [])
-        self.assertEqual(plan.variables, {})
+        assert plan.providers == []
+        assert plan.packages == []
+        assert plan.variables == {}
 
-class NixpacksDetectionTest(TestCase):
+class TestNixpacksDetection:
     def test_postgres_detection(self):
         # Exact match
         plan = NixpacksPlan(packages=["postgresql"])
-        self.assertTrue(plan.has_postgres)
+        assert plan.has_postgres is True
 
         # Substring match (e.g. postgresql-15)
         plan = NixpacksPlan(packages=["postgresql-15"])
-        self.assertTrue(plan.has_postgres)
+        assert plan.has_postgres is True
 
         # Precise match for libpq
         plan = NixpacksPlan(libraries=["libpq"])
-        self.assertTrue(plan.has_postgres)
+        assert plan.has_postgres is True
 
         # Case insensitive
         plan = NixpacksPlan(packages=["PostgreSQL"])
-        self.assertTrue(plan.has_postgres)
+        assert plan.has_postgres is True
 
     def test_redis_detection(self):
-        # Redis in libraries (previously bugged)
+        # Redis in libraries
         plan = NixpacksPlan(libraries=["redis"])
-        self.assertTrue(plan.has_redis)
+        assert plan.has_redis is True
 
         # Substring match
         plan = NixpacksPlan(packages=["redis-server"])
-        self.assertTrue(plan.has_redis)
+        assert plan.has_redis is True
