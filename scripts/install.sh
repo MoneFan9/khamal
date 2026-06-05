@@ -39,6 +39,11 @@ if ! command -v nixpacks &> /dev/null; then
     echo "👉 Install it via: curl -sSL https://nixpacks.com/install.sh | bash"
 fi
 
+if ! command -v usbguard &> /dev/null; then
+    echo -e "${YELLOW}⚠️  usbguard is not installed. It is recommended for secure physical ingestion.${NC}"
+    echo "ℹ️  Continuing installation without physical security hardening."
+fi
+
 # 2. Environment Setup
 echo -e "${BLUE}📁 Setting up environment...${NC}"
 if [ ! -f .env ]; then
@@ -86,7 +91,7 @@ if update_env('SYSTEM_ADMIN_USERNAME', username):
 "
 
 # 4. Dependency Installation
-echo -e "${BLUE}📦 Installing dependencies...${NC}"
+echo -e "${BLUE}📦 [Phase 1/3] Installing Python dependencies...${NC}"
 if [ ! -d "venv" ]; then
     python3 -m venv venv
 fi
@@ -95,12 +100,12 @@ pip install --upgrade pip
 pip install -r core/requirements.txt
 
 # 5. Database Migrations
-echo -e "${BLUE}🗄️  Running database migrations...${NC}"
+echo -e "${BLUE}🗄️  [Phase 2/3] Running database migrations...${NC}"
 export PYTHONPATH=core:.
 python3 core/manage.py migrate
 
 # 6. Initialize System Admin
-echo -e "${BLUE}👤 Setting up system administrator...${NC}"
+echo -e "${BLUE}👤 [Phase 3/3] Setting up system administrator...${NC}"
 # Load from .env manually
 export $(grep -v '^#' .env | xargs)
 python3 core/manage.py create_system_admin

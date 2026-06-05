@@ -79,6 +79,13 @@ Analyze the following preprocessed logs to perform a technical Root Cause Analys
         max_log_chars: int = 12000,
         enable_tools: bool = False
     ):
+        """
+        Architectural AI Notes:
+        1. Contextual RAG: This builder implements a Retrieval-Augmented Generation (RAG) pattern
+           specifically for log analysis, merging raw log data with project-specific metadata.
+        2. Prompt Engineering: Uses strict system instructions to prevent hallucinations
+           and ensure the local model remains focused on actionable SRE diagnostics.
+        """
         self.system_prompt = system_prompt or (self.TOOL_ENABLED_SYSTEM_PROMPT if enable_tools else self.SYSTEM_PROMPT)
         self._rca_template = rca_template or self.RCA_TEMPLATE
         self.max_log_chars = max_log_chars
@@ -109,6 +116,13 @@ Analyze the following preprocessed logs to perform a technical Root Cause Analys
         if len(formatted_logs) > self.max_log_chars:
             return f"... [truncated — showing last portion] ...\n{formatted_logs[-self.max_log_chars:]}"
         return formatted_logs
+
+    def get_system_prompt(self) -> str:
+        """
+        Returns the current system prompt being used by the builder.
+        Required for consistency across AI service layers.
+        """
+        return self.system_prompt
 
     def build_prompt(
         self,

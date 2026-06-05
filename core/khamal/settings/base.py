@@ -78,12 +78,15 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
-                "pro.white_label.context_processors.white_label",
                 "khamal.context_processors.pro_status",
             ],
         },
     },
 ]
+
+# Open-Core Architecture: Dynamically inject proprietary context processors
+if (BASE_DIR.parent / "pro").exists():
+    TEMPLATES[0]["OPTIONS"]["context_processors"].append("pro.white_label.context_processors.white_label")
 
 WSGI_APPLICATION = "khamal.wsgi.application"
 ASGI_APPLICATION = "khamal.asgi.application"
@@ -155,5 +158,6 @@ KHAMAL_ACME_STORAGE = env("KHAMAL_ACME_STORAGE", default="/letsencrypt/acme.json
 KHAMAL_ACME_CA_SERVER = env("KHAMAL_ACME_CA_SERVER", default="https://acme-v02.api.letsencrypt.org/directory")
 
 # Ollama Configuration
+# Optimized for 8GB RAM environments: reduced keep-alive to release memory faster
 OLLAMA_URL = env("OLLAMA_URL", default="http://localhost:11434")
-OLLAMA_KEEP_ALIVE = env("OLLAMA_KEEP_ALIVE", default="5m")
+OLLAMA_KEEP_ALIVE = env("OLLAMA_KEEP_ALIVE", default="30s")

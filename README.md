@@ -9,11 +9,12 @@ Khamal est un orchestrateur intelligent de déploiement (Self-Hosted PaaS) conç
 Khamal est conçu pour être opérationnel immédiatement. Notre script d'installation automatise la configuration de l'environnement, la gestion des dépendances et la sécurisation du socket Docker.
 
 ```bash
-# Clonez le dépôt
+# Installation rapide
+Khamal est conçu pour être opérationnel immédiatement.
+
+```bash
 git clone https://github.com/your-repo/khamal.git
 cd khamal
-
-# Lancez l'installation automatique (Zero-Config)
 bash scripts/install.sh
 ```
 
@@ -44,9 +45,10 @@ L'une des innovations majeures de Khamal est **LogSage**, un moteur de diagnosti
 La pile technologique est choisie pour sa robustesse et sa facilité de contribution :
 
 - **Backend** : Python 3.12+ / Django 6.0.
-- **Build Engine** : Nixpacks (détection automatique de langage, pas de Dockerfile requis).
+- **Build Engine** : Nixpacks (détection automatique de langage, pas de Dockerfile requis) avec optimisation **Docker BuildKit**.
 - **Proxy/Ingress** : Traefik v3 avec support SSL automatique.
-- **Sécurité** : Isolation par réseau Docker (`bridge` par projet) et USBGuard pour les imports physiques.
+- **Sécurité** : Isolation par réseau Docker, USBGuard pour les imports physiques (flags `noexec, nosuid, nodev`), et protection du socket Docker.
+- **Optimisation Mémoire** : Conçu pour fonctionner sur **8GB RAM** avec gestion agressive du déchargement des modèles IA (Ollama keep-alive: 30s).
 
 ## 🤝 Contribuer & Développer
 

@@ -9,6 +9,15 @@ class LogSagePreprocessor:
     thousands of lines of logs to the local model (which is slow and memory-intensive),
     LogSage identifies "anchors" (critical errors), includes their immediate context,
     and fills the remaining quota with recent relevant logs.
+
+    Architectural AI Notes:
+    1. Information Density: Local LLMs have limited context windows. LogSage ensures
+       that the most semantically dense information (errors + stack traces) is prioritized.
+    2. Multi-Phase Prioritization Strategy (MPPS):
+       - Phase 1 (Anchors): Identify high-severity lines (Ground Zero).
+       - Phase 2 (Proximity): Capture the immediate causal context (Stack Traces).
+       - Phase 3 (Recency): Fill remaining space with chronologically recent warnings.
+    3. Memory Efficiency: Uses generators to process large log files without spiking RAM.
     """
 
     # Common noise patterns in logs
@@ -133,6 +142,9 @@ class LogSagePreprocessor:
         """
         Main algorithm: filters noise, deduplicates, and prioritizes critical errors.
         Uses generators for memory efficiency.
+
+        This implementation ensures that the resulting list of logs stays within
+        'max_output_lines' while preserving chronological order for the AI.
         """
         if not raw_logs:
             return []

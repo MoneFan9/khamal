@@ -7,8 +7,20 @@ from typing import List, Optional, Dict, Any
 logger = logging.getLogger(__name__)
 
 class NixpacksError(Exception):
-    """Custom exception for Nixpacks-related errors."""
+    """
+    Custom exception for Nixpacks-related errors.
+    """
     pass
+
+"""
+Architectural Build Notes:
+1. Zero-Dockerfile: Nixpacks is the preferred build engine for Khamal, enabling
+   "Plug & Play" deployment for 20+ languages without manual configuration.
+2. BuildKit Optimization: Khamal enforces DOCKER_BUILDKIT=1 during build phases
+   to utilize advanced caching and parallel layer processing.
+3. Resource Limits: Builds are executed within standard Docker resource constraints
+   to prevent build-time memory exhaustion on 8GB host systems.
+"""
 
 @dataclass
 class NixpacksPlan:
