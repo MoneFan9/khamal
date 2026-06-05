@@ -2,6 +2,7 @@ import subprocess
 import logging
 import os
 import re
+import stat
 from pathlib import Path
 from .usb_guard import USBGuardManager
 
@@ -27,29 +28,29 @@ class USBMountManager:
                 logger.error(f"Mount point must be absolute: {mount_point}")
                 return False, device_path, mount_point
 
-            normalized_mount = os.path.normpath(mount_point)
+            mount_point = os.path.normpath(mount_point)
         except Exception as e:
             logger.error(f"Path normalization error: {e}")
             return False, device_path, mount_point
 
         if os.path.commonpath(["/dev", device_path]) != "/dev":
             logger.error(f"Invalid device path (must be in /dev): {device_path}")
-            return False, device_path, normalized_mount
+            return False, device_path, mount_point
 
         allowed_mount_base = os.path.normpath("/mnt/usb")
         try:
-            if os.path.commonpath([allowed_mount_base, normalized_mount]) != allowed_mount_base:
-                logger.error(f"Invalid mount point: {normalized_mount}. Must be within {allowed_mount_base}")
-                return False, device_path, normalized_mount
+            if os.path.commonpath([allowed_mount_base, mount_point]) != allowed_mount_base:
+                logger.error(f"Invalid mount point: {mount_point}. Must be within {allowed_mount_base}")
+                return False, device_path, mount_point
 
-            if normalized_mount == allowed_mount_base:
+            if mount_point == allowed_mount_base:
                 logger.error(f"Cannot mount directly on {allowed_mount_base}")
-                return False, device_path, normalized_mount
+                return False, device_path, mount_point
         except ValueError:
-            logger.error(f"Invalid paths for commonpath: {allowed_mount_base}, {normalized_mount}")
-            return False, device_path, normalized_mount
+            logger.error(f"Invalid paths for commonpath: {allowed_mount_base}, {mount_point}")
+            return False, device_path, mount_point
 
-        return True, device_path, normalized_mount
+        return True, device_path, mount_point
 
     @staticmethod
     def mount_volume(device_path, mount_point):
@@ -67,6 +68,16 @@ class USBMountManager:
         # 1. Path Normalization & Validation
         is_valid, device_path, mount_point = USBMountManager._validate_paths(device_path, mount_point)
         if not is_valid:
+            return False
+
+        # 2. Block Device Verification
+        # SECURITY: Ensure we are mounting a real block device, not a file or character device.
+        try:
+            if not stat.S_ISBLK(os.stat(device_path).st_mode):
+                logger.error(f"Device {device_path} is not a valid block device.")
+                return False
+        except OSError as e:
+            logger.error(f"Failed to stat device {device_path}: {e}")
             return False
 
         # 4. Integrate with USBGuard
@@ -107,9 +118,9 @@ class USBMountManager:
 
         if not os.path.exists(mount_point):
             try:
-                os.makedirs(normalized_mount, exist_ok=True)
+                os.makedirs(mount_point, exist_ok=True)
             except OSError as e:
-                logger.error(f"Failed to create mount point {normalized_mount}: {e}")
+                logger.error(f"Failed to create mount point {mount_point}: {e}")
                 return False
 
         # -o noexec: Blocks execution of binaries (essential against malware).
@@ -118,12 +129,12 @@ class USBMountManager:
         mount_options = "noexec,nosuid,nodev"
 
         try:
-            command = ["sudo", "mount", "-o", mount_options, device_path, normalized_mount]
+            command = ["sudo", "mount", "-o", mount_options, device_path, mount_point]
             subprocess.run(command, check=True, capture_output=True, text=True)
-            logger.info(f"Successfully mounted {device_path} to {normalized_mount} with security options.")
+            logger.info(f"Successfully mounted {device_path} to {mount_point} with security options.")
             return True
         except subprocess.CalledProcessError as e:
-            logger.error(f"Failed to mount {device_path} to {normalized_mount}: {e.stderr}")
+            logger.error(f"Failed to mount {device_path} to {mount_point}: {e.stderr}")
             return False
 
     @staticmethod
