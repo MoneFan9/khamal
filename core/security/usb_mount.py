@@ -2,6 +2,7 @@ import subprocess
 import logging
 import os
 import re
+import stat
 from pathlib import Path
 from .usb_guard import USBGuardManager
 
@@ -13,6 +14,13 @@ class USBMountManager:
 
     Khamal allows deploying code from physical USB drives. This class implements
     strict security controls to prevent this "physical vector" from compromising the host.
+
+    Architectural Security Notes:
+    1. Zero-Trust Physical Ingestion: No device is mounted without explicit USBGuard authorization.
+    2. Path Sanitization: All paths are normalized and restricted to /mnt/usb to prevent directory traversal.
+    3. Secure Mounting: The 'noexec, nosuid, nodev' flags are mandatory to neutralize binaries,
+       prevent privilege escalation, and disable device file interpretation.
+    4. Block Device Verification: Only legitimate block devices are processed.
     """
 
     @staticmethod
@@ -52,21 +60,31 @@ class USBMountManager:
         return True, device_path, normalized_mount
 
     @staticmethod
-    def mount_volume(device_path, mount_point):
+    def mount_volume(device_path, mount_point_raw):
         """
         Mounts a USB device to a specific mount point with security flags.
 
         Args:
             device_path (str): The path to the device (e.g., /dev/sdb1)
-            mount_point (str): The directory where the device should be mounted.
+            mount_point_raw (str): The directory where the device should be mounted.
 
         Returns:
             bool: True if successful, False otherwise.
         """
         # --- Security Hardening Protocol ---
         # 1. Path Normalization & Validation
-        is_valid, device_path, mount_point = USBMountManager._validate_paths(device_path, mount_point)
+        is_valid, device_path, normalized_mount = USBMountManager._validate_paths(device_path, mount_point_raw)
         if not is_valid:
+            return False
+
+        # 2. Block Device Verification
+        # We ensure the source is a real block device before proceeding.
+        try:
+            if not stat.S_ISBLK(os.stat(device_path).st_mode):
+                logger.error(f"Device {device_path} is not a valid block device.")
+                return False
+        except OSError as e:
+            logger.error(f"Failed to stat device {device_path}: {e}")
             return False
 
         # 4. Integrate with USBGuard
@@ -105,13 +123,14 @@ class USBMountManager:
              logger.error(f"Device {device_path} is not authorized by USBGuard.")
              return False
 
-        if not os.path.exists(mount_point):
+        if not os.path.exists(normalized_mount):
             try:
                 os.makedirs(normalized_mount, exist_ok=True)
             except OSError as e:
                 logger.error(f"Failed to create mount point {normalized_mount}: {e}")
                 return False
 
+        # Step 3: Secure Mounting Environment
         # -o noexec: Blocks execution of binaries (essential against malware).
         # -o nosuid: Prevents privilege escalation via setuid/setgid bits.
         # -o nodev: Disables device files interpretation.

@@ -3,6 +3,17 @@ from django.conf import settings
 from contextlib import contextmanager
 
 class OllamaClient:
+    """
+    OllamaClient: High-level interface for local AI orchestration.
+
+    Architectural Security & Performance Notes:
+    1. Memory Sovereignty: Khamal is optimized for 8GB RAM. This client uses a short
+       30s keep-alive window (and 'keep_alive: 0' via session cleanup) to release
+       GPU/RAM resources as fast as possible.
+    2. Local-First: All inference is performed on-premise. No data leaves the server.
+    3. Session Management: Use the 'session' context manager to ensure automatic
+       memory cleanup.
+    """
     def __init__(self, base_url=None):
         self.base_url = base_url or getattr(settings, "OLLAMA_URL", "http://localhost:11434")
         self.keep_alive = getattr(settings, "OLLAMA_KEEP_ALIVE", "5m")
