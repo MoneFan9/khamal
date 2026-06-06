@@ -72,6 +72,12 @@ Analyze the following preprocessed logs to perform a technical Root Cause Analys
 
     KNOWN_CONTEXT_KEYS = {"project_name", "language", "environment"}
 
+    def get_system_prompt(self) -> str:
+        """
+        Returns the active system prompt.
+        """
+        return self.system_prompt
+
     def __init__(
         self,
         system_prompt: Optional[str] = None,
