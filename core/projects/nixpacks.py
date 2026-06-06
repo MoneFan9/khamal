@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import os
 from dataclasses import dataclass, field
 from typing import List, Optional, Dict, Any
 
@@ -91,10 +92,15 @@ async def _run_nixpacks_command(cmd: List[str], error_prefix: str) -> str:
     """
     logger.info(f"Running Nixpacks command: {' '.join(cmd)}")
     try:
+        # Enable BuildKit for better performance
+        env = os.environ.copy()
+        env["DOCKER_BUILDKIT"] = "1"
+
         process = await asyncio.create_subprocess_exec(
             *cmd,
             stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
+            stderr=asyncio.subprocess.PIPE,
+            env=env
         )
 
         stdout, stderr = await process.communicate()
