@@ -84,6 +84,12 @@ Analyze the following preprocessed logs to perform a technical Root Cause Analys
         self.max_log_chars = max_log_chars
         self.enable_tools = enable_tools
 
+    def get_system_prompt(self) -> str:
+        """
+        Returns the current system prompt.
+        """
+        return self.system_prompt
+
     def _get_merged_context(self, project_context: Optional[dict[str, str]]) -> dict[str, str]:
         """
         Returns the merged project context with default values.
