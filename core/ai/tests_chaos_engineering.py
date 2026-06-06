@@ -67,3 +67,18 @@ class TestChaosEngineering(unittest.TestCase):
     def test_syntax_error_scenario(self):
         scenario = ChaosGenerator.get_syntax_error()
         self._run_chaos_pipeline(scenario)
+
+    def test_oom_error_scenario(self):
+        """Tests the pipeline's ability to handle Out Of Memory errors."""
+        scenario = ChaosGenerator.get_oom_error()
+        self._run_chaos_pipeline(scenario)
+
+    def test_permission_denied_scenario(self):
+        """Tests the pipeline's ability to handle Permission Denied errors."""
+        scenario = ChaosGenerator.get_permission_denied()
+        self._run_chaos_pipeline(scenario)
+
+    def test_dependency_conflict_scenario(self):
+        """Tests the pipeline's ability to handle Dependency Conflict errors."""
+        scenario = ChaosGenerator.get_dependency_conflict()
+        self._run_chaos_pipeline(scenario)

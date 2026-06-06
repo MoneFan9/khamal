@@ -76,3 +76,70 @@ SyntaxError: invalid syntax
             "fixed_block": "def list_items(request):",
             "rationale": "Missing colon after function definition in api/v1/endpoints.py."
         }
+
+    @staticmethod
+    def get_oom_error():
+        return {
+            "name": "Out of Memory (OOM) Error",
+            "logs": """
+[2024-05-20 10:00:05] INFO: Processing batch #42
+[2024-05-20 10:00:10] CRITICAL: Memory usage exceeded 95%
+[2024-05-20 10:00:11] FATAL: OutOfMemoryError: Java heap space
+[2024-05-20 10:00:11] INFO: Process terminated by OOM Killer
+            """,
+            "project_context": {
+                "project_name": "Data-Processor",
+                "language": "Java/Spring",
+                "environment": "Production"
+            },
+            "broken_file": "nixpacks.toml",
+            "broken_content": "[variables]\nJAVA_OPTS = \"-Xmx128m\"",
+            "fixed_content": "[variables]\nJAVA_OPTS = \"-Xmx512m\"",
+            "search_block": "JAVA_OPTS = \"-Xmx128m\"",
+            "fixed_block": "JAVA_OPTS = \"-Xmx512m\"",
+            "rationale": "The application ran out of memory. Increasing the JVM heap size in nixpacks.toml."
+        }
+
+    @staticmethod
+    def get_permission_denied():
+        return {
+            "name": "Permission Denied",
+            "logs": """
+[2024-05-20 10:05:00] ERROR: PermissionError: [Errno 13] Permission denied: '/app/storage/logs/app.log'
+[2024-05-20 10:05:00] CRITICAL: Failed to initialize log writer.
+            """,
+            "project_context": {
+                "project_name": "Log-Aggregator",
+                "language": "Python",
+                "environment": "Production"
+            },
+            "broken_file": "scripts/setup.sh",
+            "broken_content": "mkdir -p /app/storage/logs\nchmod 444 /app/storage/logs",
+            "fixed_content": "mkdir -p /app/storage/logs\nchmod 755 /app/storage/logs",
+            "search_block": "chmod 444 /app/storage/logs",
+            "fixed_block": "chmod 755 /app/storage/logs",
+            "rationale": "The application lacks write permissions to the log directory. Correcting chmod value."
+        }
+
+    @staticmethod
+    def get_dependency_conflict():
+        return {
+            "name": "Dependency Version Conflict",
+            "logs": """
+ERROR: Cannot install -r requirements.txt (line 3) because of a version conflict.
+The conflict is caused by:
+    The user requested Django==5.0
+    The app requires Django>=6.0.4
+            """,
+            "project_context": {
+                "project_name": "Legacy-Portal",
+                "language": "Python/Django",
+                "environment": "Staging"
+            },
+            "broken_file": "requirements.txt",
+            "broken_content": "django==5.0\ndjangorestframework==3.15.0",
+            "fixed_content": "django>=6.0.4\ndjangorestframework==3.15.0",
+            "search_block": "django==5.0",
+            "fixed_block": "django>=6.0.4",
+            "rationale": "Version conflict detected for Django. Updating requirements.txt to a compatible version."
+        }
