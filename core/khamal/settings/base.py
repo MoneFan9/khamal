@@ -78,12 +78,15 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
-                "pro.white_label.context_processors.white_label",
                 "khamal.context_processors.pro_status",
             ],
         },
     },
 ]
+
+# Add Pro context processors if available
+if (BASE_DIR.parent / "pro").exists():
+    TEMPLATES[0]["OPTIONS"]["context_processors"].append("pro.white_label.context_processors.white_label")
 
 WSGI_APPLICATION = "khamal.wsgi.application"
 ASGI_APPLICATION = "khamal.asgi.application"
@@ -156,4 +159,4 @@ KHAMAL_ACME_CA_SERVER = env("KHAMAL_ACME_CA_SERVER", default="https://acme-v02.a
 
 # Ollama Configuration
 OLLAMA_URL = env("OLLAMA_URL", default="http://localhost:11434")
-OLLAMA_KEEP_ALIVE = env("OLLAMA_KEEP_ALIVE", default="5m")
+OLLAMA_KEEP_ALIVE = env("OLLAMA_KEEP_ALIVE", default="30s")
