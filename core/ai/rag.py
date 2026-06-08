@@ -129,6 +129,7 @@ Analyze the following preprocessed logs to perform a technical Root Cause Analys
         )
         return RCAPrompt(system=self.system_prompt, user=user_content)
 
+
     def __repr__(self) -> str:
         return (
             f"RCAPromptBuilder("
