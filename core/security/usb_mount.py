@@ -2,6 +2,7 @@ import subprocess
 import logging
 import os
 import re
+import stat
 from pathlib import Path
 from .usb_guard import USBGuardManager
 
@@ -52,22 +53,30 @@ class USBMountManager:
         return True, device_path, normalized_mount
 
     @staticmethod
-    def mount_volume(device_path, mount_point):
+    def mount_volume(device_path, mount_point_raw):
         """
         Mounts a USB device to a specific mount point with security flags.
 
         Args:
             device_path (str): The path to the device (e.g., /dev/sdb1)
-            mount_point (str): The directory where the device should be mounted.
+            mount_point_raw (str): The directory where the device should be mounted.
 
         Returns:
             bool: True if successful, False otherwise.
         """
         # --- Security Hardening Protocol ---
         # 1. Path Normalization & Validation
-        is_valid, device_path, mount_point = USBMountManager._validate_paths(device_path, mount_point)
+        is_valid, device_path, mount_point = USBMountManager._validate_paths(device_path, mount_point_raw)
         if not is_valid:
             return False
+
+        # 2. Verify Block Device (Anti-Symlink/FIFO/Socket)
+        if not Path(device_path).is_block_device():
+            logger.error(f"Device {device_path} is not a block device.")
+            return False
+
+        # 3. Secure Mounting Environment
+        # (Verified via mount options below)
 
         # 4. Integrate with USBGuard
         if not USBGuardManager.is_installed():
@@ -107,9 +116,9 @@ class USBMountManager:
 
         if not os.path.exists(mount_point):
             try:
-                os.makedirs(normalized_mount, exist_ok=True)
+                os.makedirs(mount_point, exist_ok=True)
             except OSError as e:
-                logger.error(f"Failed to create mount point {normalized_mount}: {e}")
+                logger.error(f"Failed to create mount point {mount_point}: {e}")
                 return False
 
         # -o noexec: Blocks execution of binaries (essential against malware).
@@ -118,12 +127,12 @@ class USBMountManager:
         mount_options = "noexec,nosuid,nodev"
 
         try:
-            command = ["sudo", "mount", "-o", mount_options, device_path, normalized_mount]
+            command = ["sudo", "mount", "-o", mount_options, device_path, mount_point]
             subprocess.run(command, check=True, capture_output=True, text=True)
-            logger.info(f"Successfully mounted {device_path} to {normalized_mount} with security options.")
+            logger.info(f"Successfully mounted {device_path} to {mount_point} with security options.")
             return True
         except subprocess.CalledProcessError as e:
-            logger.error(f"Failed to mount {device_path} to {normalized_mount}: {e.stderr}")
+            logger.error(f"Failed to mount {device_path} to {mount_point}: {e.stderr}")
             return False
 
     @staticmethod
