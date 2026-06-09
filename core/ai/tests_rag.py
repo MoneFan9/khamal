@@ -1,32 +1,33 @@
-import unittest
+import pytest
 from .rag import RCAPromptBuilder, RCAPrompt
 
-class TestRCAPromptBuilder(unittest.TestCase):
-    def setUp(self):
-        self.builder = RCAPromptBuilder()
+class TestRCAPromptBuilder:
+    @pytest.fixture
+    def builder(self):
+        return RCAPromptBuilder()
 
-    def test_build_prompt_basic(self):
+    def test_build_prompt_basic(self, builder):
         logs = ["ERROR: Connection refused", "INFO: Retrying..."]
-        prompt_obj = self.builder.build_prompt(logs)
+        prompt_obj = builder.build_prompt(logs)
 
-        self.assertIsInstance(prompt_obj, RCAPrompt)
-        self.assertIn("### Environment Context", prompt_obj.user)
-        self.assertIn("ERROR: Connection refused", prompt_obj.user)
-        self.assertIn("**Project Name**: Unknown", prompt_obj.user)
-        self.assertEqual(prompt_obj.system, self.builder.SYSTEM_PROMPT)
+        assert isinstance(prompt_obj, RCAPrompt)
+        assert "### Environment Context" in prompt_obj.user
+        assert "ERROR: Connection refused" in prompt_obj.user
+        assert "**Project Name**: Unknown" in prompt_obj.user
+        assert prompt_obj.system == builder.SYSTEM_PROMPT
 
-    def test_to_ollama_messages(self):
+    def test_to_ollama_messages(self, builder):
         logs = ["ERROR: Fail"]
-        prompt_obj = self.builder.build_prompt(logs)
+        prompt_obj = builder.build_prompt(logs)
         messages = prompt_obj.to_ollama_messages()
 
-        self.assertEqual(len(messages), 2)
-        self.assertEqual(messages[0]["role"], "system")
-        self.assertEqual(messages[1]["role"], "user")
-        self.assertEqual(messages[0]["content"], prompt_obj.system)
-        self.assertEqual(messages[1]["content"], prompt_obj.user)
+        assert len(messages) == 2
+        assert messages[0]["role"] == "system"
+        assert messages[1]["role"] == "user"
+        assert messages[0]["content"] == prompt_obj.system
+        assert messages[1]["content"] == prompt_obj.user
 
-    def test_build_prompt_with_context(self):
+    def test_build_prompt_with_context(self, builder):
         logs = ["ERROR: Syntax error"]
         context = {
             "project_name": "MyCoolApp",
@@ -34,29 +35,29 @@ class TestRCAPromptBuilder(unittest.TestCase):
             "environment": "Development",
             "ignored_key": "ShouldNotBeHere"
         }
-        prompt_obj = self.builder.build_prompt(logs, project_context=context)
+        prompt_obj = builder.build_prompt(logs, project_context=context)
 
-        self.assertIn("**Project Name**: MyCoolApp", prompt_obj.user)
-        self.assertIn("**Primary Language/Framework**: Django/Python", prompt_obj.user)
-        self.assertIn("**Deployment Environment**: Development", prompt_obj.user)
-        self.assertNotIn("ignored_key", prompt_obj.user)
+        assert "**Project Name**: MyCoolApp" in prompt_obj.user
+        assert "**Primary Language/Framework**: Django/Python" in prompt_obj.user
+        assert "**Deployment Environment**: Development" in prompt_obj.user
+        assert "ignored_key" not in prompt_obj.user
 
-    def test_empty_logs_raises_value_error(self):
-        with self.assertRaises(ValueError):
-            self.builder.build_prompt([])
+    def test_empty_logs_raises_value_error(self, builder):
+        with pytest.raises(ValueError):
+            builder.build_prompt([])
 
-    def test_invalid_logs_raises_value_error(self):
-        with self.assertRaises(ValueError):
-            self.builder.build_prompt([None])
+    def test_invalid_logs_raises_value_error(self, builder):
+        with pytest.raises(ValueError):
+            builder.build_prompt([None])
 
     def test_truncation(self):
         short_builder = RCAPromptBuilder(max_log_chars=10)
         logs = ["This is a long log line"]
         prompt_obj = short_builder.build_prompt(logs)
 
-        self.assertIn("[truncated", prompt_obj.user)
+        assert "[truncated" in prompt_obj.user
         # It should keep the end of the log (before the closing markers)
-        self.assertIn("g log line\n```", prompt_obj.user)
+        assert "g log line\n```" in prompt_obj.user
 
     def test_custom_template(self):
         custom_template = "PROJECT: {project_name} LOGS: {logs}"
@@ -64,11 +65,11 @@ class TestRCAPromptBuilder(unittest.TestCase):
         logs = ["log1"]
         prompt_obj = builder.build_prompt(logs, project_context={"project_name": "Test"})
 
-        self.assertEqual(prompt_obj.user, "PROJECT: Test LOGS: log1")
+        assert prompt_obj.user == "PROJECT: Test LOGS: log1"
 
-    def test_repr(self):
-        self.assertIn("RCAPromptBuilder", repr(self.builder))
-        self.assertIn("max_log_chars=12000", repr(self.builder))
+    def test_repr(self, builder):
+        assert "RCAPromptBuilder" in repr(builder)
+        assert "max_log_chars=12000" in repr(builder)
 
-    def test_get_system_prompt(self):
-        self.assertEqual(self.builder.get_system_prompt(), self.builder.SYSTEM_PROMPT)
+    def test_system_prompt_attribute(self, builder):
+        assert builder.system_prompt == builder.SYSTEM_PROMPT
