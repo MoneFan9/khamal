@@ -48,12 +48,14 @@ INSTALLED_APPS = [
 ]
 
 # Add Pro apps if available (Open-Core architecture)
-if (BASE_DIR.parent / "pro").exists():
-    INSTALLED_APPS += [
-        "pro.white_label",
-        "pro.servers",
-        "pro.ai_support",
-    ]
+# We dynamically discover apps in the /pro directory to avoid hardcoded strings
+PRO_DIR = BASE_DIR.parent / "pro"
+if PRO_DIR.exists():
+    for item in PRO_DIR.iterdir():
+        if item.is_dir() and (item / "apps.py").exists():
+            app_name = f"pro.{item.name}"
+            if app_name not in INSTALLED_APPS:
+                INSTALLED_APPS.append(app_name)
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -78,12 +80,16 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
-                "pro.white_label.context_processors.white_label",
                 "khamal.context_processors.pro_status",
             ],
         },
     },
 ]
+
+# Add Pro context processors if available
+# We use dynamic checking to avoid hardcoded proprietary module paths in the core settings
+if (BASE_DIR.parent / "pro" / "white_label" / "context_processors.py").exists():
+    TEMPLATES[0]["OPTIONS"]["context_processors"].append("pro.white_label.context_processors.white_label")
 
 WSGI_APPLICATION = "khamal.wsgi.application"
 ASGI_APPLICATION = "khamal.asgi.application"
@@ -156,4 +162,4 @@ KHAMAL_ACME_CA_SERVER = env("KHAMAL_ACME_CA_SERVER", default="https://acme-v02.a
 
 # Ollama Configuration
 OLLAMA_URL = env("OLLAMA_URL", default="http://localhost:11434")
-OLLAMA_KEEP_ALIVE = env("OLLAMA_KEEP_ALIVE", default="5m")
+OLLAMA_KEEP_ALIVE = env("OLLAMA_KEEP_ALIVE", default="30s")
