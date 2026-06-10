@@ -68,19 +68,24 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = "khamal.urls"
 
+CONTEXT_PROCESSORS = [
+    "django.template.context_processors.request",
+    "django.contrib.auth.context_processors.auth",
+    "django.contrib.messages.context_processors.messages",
+    "khamal.context_processors.pro_status",
+]
+
+# Dynamically add Pro context processors if available
+if (BASE_DIR.parent / "pro" / "white_label" / "context_processors.py").exists():
+    CONTEXT_PROCESSORS.append("pro.white_label.context_processors.white_label")
+
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
         "DIRS": [BASE_DIR / "templates"],
         "APP_DIRS": True,
         "OPTIONS": {
-            "context_processors": [
-                "django.template.context_processors.request",
-                "django.contrib.auth.context_processors.auth",
-                "django.contrib.messages.context_processors.messages",
-                "pro.white_label.context_processors.white_label",
-                "khamal.context_processors.pro_status",
-            ],
+            "context_processors": CONTEXT_PROCESSORS,
         },
     },
 ]
