@@ -1,3 +1,4 @@
+import stat
 from django.test import TestCase
 from unittest.mock import patch, MagicMock
 from security.usb_guard import USBGuardManager
@@ -70,7 +71,7 @@ class USBGuardTests(TestCase):
 
 class USBMountTests(TestCase):
 
-    @patch("security.usb_mount.Path.is_block_device")
+    @patch("os.stat")
     @patch("security.usb_mount.USBGuardManager.list_devices")
     @patch("security.usb_mount.USBGuardManager.is_service_active")
     @patch("security.usb_mount.USBGuardManager.is_installed")
@@ -81,7 +82,7 @@ class USBMountTests(TestCase):
         mock_usbguard.return_value = True
         mock_active.return_value = True
         mock_list.return_value = "1: allow id 1234:5678 serial \"\" name \"\" hash \"\" parent-hash \"\" via-port \"usb1\" with-interface { 08:06:50 } with-connect-type \"\" with-devpath \"/dev/sdb1\""
-        mock_block.return_value = True
+        mock_block.return_value = MagicMock(st_mode=stat.S_IFBLK | 0o666)
         mock_exists.return_value = False
         mock_run.return_value = MagicMock(returncode=0)
 
@@ -94,7 +95,7 @@ class USBMountTests(TestCase):
             check=True, capture_output=True, text=True
         )
 
-    @patch("security.usb_mount.Path.is_block_device")
+    @patch("os.stat")
     @patch("security.usb_mount.USBGuardManager.list_devices")
     @patch("security.usb_mount.USBGuardManager.is_service_active")
     @patch("security.usb_mount.USBGuardManager.is_installed")
@@ -104,7 +105,7 @@ class USBMountTests(TestCase):
         mock_usbguard.return_value = True
         mock_active.return_value = True
         mock_list.return_value = "allow /dev/sdb1"
-        mock_block.return_value = True
+        mock_block.return_value = MagicMock(st_mode=stat.S_IFBLK | 0o666)
         mock_exists.return_value = True
         mock_run.side_effect = subprocess.CalledProcessError(1, "mount", stderr="Permission denied")
 
