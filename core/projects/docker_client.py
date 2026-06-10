@@ -17,7 +17,8 @@ class HardenedContainerCollection:
         forbidden_params = {
             'privileged', 'cap_add', 'security_opt', 'userns_mode',
             'pid_mode', 'group_add', 'oom_kill_disable', 'devices',
-            'device_cgroup_rules'
+            'device_cgroup_rules', 'network_mode', 'ipc_mode', 'uts_mode',
+            'sysctls'
         }
 
         def _recursive_check(d):
