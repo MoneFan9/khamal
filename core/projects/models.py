@@ -59,3 +59,56 @@ class Deployment(models.Model):
 
     def __str__(self):
         return f"{self.project.name} - {self.status} ({self.created_at})"
+
+class DatabaseInstance(models.Model):
+    """
+    Represents a provisioned database instance for a project.
+    Stores credentials and configuration for persistence and DR.
+    """
+    class Engine(models.TextChoices):
+        POSTGRES = "postgres", "PostgreSQL"
+        REDIS = "redis", "Redis"
+
+    project = models.ForeignKey(
+        Project,
+        on_delete=models.CASCADE,
+        related_name="databases"
+    )
+    engine = models.CharField(max_length=20, choices=Engine.choices)
+    db_name = models.CharField(max_length=255, default="khamal")
+    db_user = models.CharField(max_length=255, default="khamal")
+    db_password = models.CharField(max_length=255)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('project', 'engine')
+
+    def __str__(self):
+        return f"{self.project.name} - {self.engine}"
+
+class Backup(models.Model):
+    """
+    Tracks database backups for Disaster Recovery.
+    """
+    class Status(models.TextChoices):
+        PENDING = "PENDING", "Pending"
+        COMPLETED = "COMPLETED", "Completed"
+        FAILED = "FAILED", "Failed"
+
+    project = models.ForeignKey(
+        Project,
+        on_delete=models.CASCADE,
+        related_name="backups"
+    )
+    engine = models.CharField(max_length=20, choices=DatabaseInstance.Engine.choices)
+    file_path = models.CharField(max_length=512)
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.PENDING
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Backup {self.engine} - {self.project.name} ({self.created_at})"

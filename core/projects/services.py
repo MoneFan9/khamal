@@ -6,6 +6,8 @@ import logging
 import docker
 import secrets
 import time
+import os
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -400,36 +402,199 @@ def _wait_for_healthy(container, timeout: int = 60):
         time.sleep(2)
     return False
 
-def _get_db_config(engine: str, project_id: int) -> tuple[dict, dict]:
+def perform_database_backup(project: Project, engine: str) -> str:
     """
-    Returns the environment variables and volume mappings for the database engine.
+    Performs a database backup for the given project and engine.
+    Returns the path to the backup file.
     """
-    environment = {}
-    if engine == "postgres":
-        environment = {
-            "POSTGRES_DB": "khamal",
-            "POSTGRES_USER": "khamal",
-            "POSTGRES_PASSWORD": secrets.token_urlsafe(16)
-        }
+    from .models import Backup, DatabaseInstance
+    client = get_docker_client()
+    container_name = f"khamal-db-{engine}-{project.id}"
 
-    volumes = {
-        f"khamal-data-{engine}-{project_id}": {
-            "bind": "/var/lib/postgresql/data" if engine == "postgres" else "/data",
-            "mode": "rw"
-        }
-    }
-    return environment, volumes
+    # Ensure backup directory exists
+    backup_dir = os.path.join(settings.BASE_DIR, "backups", str(project.id))
+    os.makedirs(backup_dir, exist_ok=True)
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    backup_obj = Backup.objects.create(
+        project=project,
+        engine=engine,
+        status=Backup.Status.PENDING
+    )
+
+    try:
+        container = client.containers.get(container_name)
+
+        if engine == "postgres":
+            db_inst = DatabaseInstance.objects.get(project=project, engine=engine)
+            file_name = f"backup_{engine}_{timestamp}.sql"
+            file_path = os.path.join(backup_dir, file_name)
+
+            # Use pg_dump via docker exec - stream output to file to avoid OOM
+            # Use socket and demultiplexing to get raw stdout
+            from docker.utils import socket as docker_socket
+
+            cmd = f"pg_dump -U {db_inst.db_user} {db_inst.db_name}"
+
+            res = container.exec_run(
+                cmd,
+                environment={"PGPASSWORD": db_inst.db_password},
+                stream=True,
+                socket=True
+            )
+
+            sock = res.output
+            with open(file_path, "wb") as f:
+                for header, payload in docker_socket.frames_iter(sock, tty=False):
+                    f.write(payload)
+
+        elif engine == "redis":
+            file_name = f"backup_{engine}_{timestamp}.rdb"
+            file_path = os.path.join(backup_dir, file_name)
+
+            # Redis: call BGSAVE then wait for completion
+            exit_code, output = container.exec_run("redis-cli BGSAVE")
+            if exit_code != 0:
+                raise Exception(f"Redis BGSAVE failed: {output.decode()}")
+
+            # Wait for BGSAVE to finish
+            for _ in range(30): # 30 seconds timeout
+                ec, out = container.exec_run("redis-cli info Persistence")
+                if b"rdb_bgsave_in_progress:0" in out:
+                    break
+                time.sleep(1)
+
+            # Copy dump.rdb from container using streaming
+            bits, stat = container.get_archive("/data/dump.rdb")
+
+            # Extraction from tar stream without loading all in memory
+            import tarfile
+
+            # We need a custom File-like object that wraps the generator for tarfile
+            class StreamWrapper:
+                def __init__(self, generator):
+                    self.generator = generator
+                    self.buffer = b""
+
+                def read(self, size=-1):
+                    try:
+                        while size == -1 or len(self.buffer) < size:
+                            self.buffer += next(self.generator)
+                    except StopIteration:
+                        pass
+
+                    if size == -1:
+                        res, self.buffer = self.buffer, b""
+                    else:
+                        res, self.buffer = self.buffer[:size], self.buffer[size:]
+                    return res
+
+            with tarfile.open(fileobj=StreamWrapper(bits), mode='r|') as tar:
+                for member in tar:
+                    if member.name == "dump.rdb":
+                        f_in = tar.extractfile(member)
+                        with open(file_path, "wb") as f_out:
+                            while True:
+                                chunk = f_in.read(65536)
+                                if not chunk:
+                                    break
+                                f_out.write(chunk)
+        else:
+            raise ValueError(f"Unsupported backup engine: {engine}")
+
+        backup_obj.file_path = file_path
+        backup_obj.status = Backup.Status.COMPLETED
+        backup_obj.save()
+
+        logger.info(f"Backup completed for {project.name} ({engine}): {file_path}")
+        return file_path
+
+    except Exception as e:
+        logger.error(f"Backup failed for {project.name} ({engine}): {e}")
+        backup_obj.status = Backup.Status.FAILED
+        backup_obj.save()
+        raise
+
+def restore_database_backup(backup: 'Backup'):
+    """
+    Restores a database from a backup file into a newly provisioned container.
+    """
+    from .models import DatabaseInstance
+    project = backup.project
+    engine = backup.engine
+
+    # 1. Ensure the DB is provisioned (this will also ensure credentials exist)
+    container = provision_database(project, engine)
+
+    db_inst = DatabaseInstance.objects.get(project=project, engine=engine)
+
+    try:
+        import tarfile
+        import io
+
+        if engine == "postgres":
+            # 1. Put the SQL file into the container via tar stream (avoiding loading file in memory)
+            import tempfile
+
+            with tempfile.NamedTemporaryFile() as tmp_tar_file:
+                with tarfile.open(name=tmp_tar_file.name, mode='w') as tar:
+                    tar.add(backup.file_path, arcname="restore.sql")
+
+                with open(tmp_tar_file.name, 'rb') as f:
+                    container.put_archive("/", f)
+
+            exit_code, output = container.exec_run(
+                f"psql -U {db_inst.db_user} {db_inst.db_name} -f /restore.sql",
+                environment={"PGPASSWORD": db_inst.db_password}
+            )
+
+            if exit_code != 0:
+                raise Exception(f"PostgreSQL restore failed: {output.decode()}")
+
+        elif engine == "redis":
+            # Redis: stop container, replace dump.rdb, start container
+            container.stop()
+
+            import tempfile
+            with tempfile.NamedTemporaryFile() as tmp_tar_file:
+                with tarfile.open(name=tmp_tar_file.name, mode='w') as tar:
+                    tar.add(backup.file_path, arcname="dump.rdb")
+
+                with open(tmp_tar_file.name, 'rb') as f:
+                    # Re-get container to be sure
+                    client = get_docker_client()
+                    container = client.containers.get(container.id)
+                    container.put_archive("/data", f)
+
+            container.start()
+
+        logger.info(f"Restoration completed for {project.name} ({engine}) from {backup.file_path}")
+
+    except Exception as e:
+        logger.error(f"Restoration failed for {project.name} ({engine}): {e}")
+        raise
 
 def provision_database(project: Project, engine: str):
     """
     Provisions a database container (PostgreSQL or Redis) for the project.
     """
+    from .models import DatabaseInstance
     client = get_docker_client()
     project_network_id = ensure_project_network(project)
     network_obj = client.networks.get(project_network_id)
 
     container_name = f"khamal-db-{engine}-{project.id}"
     image = DATABASE_IMAGES.get(engine, f"{engine}:latest")
+
+    # Check if we already have a record for this DB instance
+    db_instance, created = DatabaseInstance.objects.get_or_create(
+        project=project,
+        engine=engine,
+        defaults={
+            "db_password": secrets.token_urlsafe(16) if engine == "postgres" else ""
+        }
+    )
 
     try:
         container = client.containers.get(container_name)
@@ -440,7 +605,21 @@ def provision_database(project: Project, engine: str):
     except docker.errors.NotFound:
         logger.info(f"Provisioning new {engine} container: {container_name}")
 
-    environment, volumes = _get_db_config(engine, project.id)
+    # Use the persisted credentials
+    environment = {}
+    if engine == "postgres":
+        environment = {
+            "POSTGRES_DB": db_instance.db_name,
+            "POSTGRES_USER": db_instance.db_user,
+            "POSTGRES_PASSWORD": db_instance.db_password
+        }
+
+    volumes = {
+        f"khamal-data-{engine}-{project.id}": {
+            "bind": "/var/lib/postgresql/data" if engine == "postgres" else "/data",
+            "mode": "rw"
+        }
+    }
 
     try:
         # SECURITY: Privileged mode and cap_add are strictly forbidden.
