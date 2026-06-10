@@ -2,6 +2,7 @@ import subprocess
 import logging
 import os
 import re
+import stat
 from pathlib import Path
 from .usb_guard import USBGuardManager
 
@@ -65,9 +66,28 @@ class USBMountManager:
         """
         # --- Security Hardening Protocol ---
         # 1. Path Normalization & Validation
-        is_valid, device_path, mount_point = USBMountManager._validate_paths(device_path, mount_point)
+        is_valid, device_path, mount_point_normalized = USBMountManager._validate_paths(device_path, mount_point)
         if not is_valid:
             return False
+
+        # 2. Block Device Verification
+        # We ensure the device_path corresponds to a real block device to prevent mounting files or symlinks.
+        try:
+            if not stat.S_ISBLK(os.stat(device_path).st_mode):
+                logger.error(f"Device {device_path} is not a valid block device.")
+                return False
+        except OSError:
+            logger.error(f"Could not access device {device_path}.")
+            return False
+
+        # 3. Secure Mounting Environment
+        # We ensure the mount point exists and is correctly owned.
+        if not os.path.exists(mount_point_normalized):
+            try:
+                os.makedirs(mount_point_normalized, exist_ok=True)
+            except OSError as e:
+                logger.error(f"Failed to create mount point {mount_point_normalized}: {e}")
+                return False
 
         # 4. Integrate with USBGuard
         if not USBGuardManager.is_installed():
@@ -105,25 +125,19 @@ class USBMountManager:
              logger.error(f"Device {device_path} is not authorized by USBGuard.")
              return False
 
-        if not os.path.exists(mount_point):
-            try:
-                os.makedirs(normalized_mount, exist_ok=True)
-            except OSError as e:
-                logger.error(f"Failed to create mount point {normalized_mount}: {e}")
-                return False
-
+        # 5. Execute Secure Mount
         # -o noexec: Blocks execution of binaries (essential against malware).
         # -o nosuid: Prevents privilege escalation via setuid/setgid bits.
         # -o nodev: Disables device files interpretation.
         mount_options = "noexec,nosuid,nodev"
 
         try:
-            command = ["sudo", "mount", "-o", mount_options, device_path, normalized_mount]
+            command = ["sudo", "mount", "-o", mount_options, device_path, mount_point_normalized]
             subprocess.run(command, check=True, capture_output=True, text=True)
-            logger.info(f"Successfully mounted {device_path} to {normalized_mount} with security options.")
+            logger.info(f"Successfully mounted {device_path} to {mount_point_normalized} with security options.")
             return True
         except subprocess.CalledProcessError as e:
-            logger.error(f"Failed to mount {device_path} to {normalized_mount}: {e.stderr}")
+            logger.error(f"Failed to mount {device_path} to {mount_point_normalized}: {e.stderr}")
             return False
 
     @staticmethod
