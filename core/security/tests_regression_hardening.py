@@ -1,3 +1,5 @@
+import stat
+
 from django.test import TestCase
 from unittest.mock import patch, MagicMock
 from projects.docker_client import get_docker_client
@@ -29,7 +31,7 @@ class RegressionSecurityHardeningTests(TestCase):
             _ = client._client
         self.assertIn("Direct access to low-level Docker API '_client' is restricted", str(cm.exception))
 
-    @patch("security.usb_mount.Path.is_block_device")
+    @patch("security.usb_mount.os.stat")
     @patch("security.usb_mount.USBGuardManager.list_devices")
     @patch("security.usb_mount.USBGuardManager.is_service_active")
     @patch("security.usb_mount.USBGuardManager.is_installed")
@@ -37,7 +39,7 @@ class RegressionSecurityHardeningTests(TestCase):
         """Test that device path substring matching doesn't allow bypass (e.g. /dev/sdb matching /dev/sdb1)."""
         mock_installed.return_value = True
         mock_active.return_value = True
-        mock_block.return_value = True
+        mock_block.return_value = MagicMock(st_mode=stat.S_IFBLK | 0o666)
 
         # Scenario: /dev/sdb1 is allowed, but someone tries to mount /dev/sdb (if it were possible)
         # Or more realistically: /dev/sdb is allowed, but /dev/sdb1 is NOT.
@@ -56,7 +58,7 @@ class RegressionSecurityHardeningTests(TestCase):
         result = USBMountManager.mount_volume("/dev/sdb", "/mnt/usb/stick")
         self.assertFalse(result, "Should not allow /dev/sdb when only /dev/sdb1 is authorized")
 
-    @patch("security.usb_mount.Path.is_block_device")
+    @patch("security.usb_mount.os.stat")
     @patch("security.usb_mount.USBGuardManager.list_devices")
     @patch("security.usb_mount.USBGuardManager.is_service_active")
     @patch("security.usb_mount.USBGuardManager.is_installed")
@@ -66,7 +68,7 @@ class RegressionSecurityHardeningTests(TestCase):
         """Verify that allowing the parent device allows mounting the partition."""
         mock_installed.return_value = True
         mock_active.return_value = True
-        mock_block.return_value = True
+        mock_block.return_value = MagicMock(st_mode=stat.S_IFBLK | 0o666)
         mock_run.return_value = MagicMock(returncode=0)
 
         # /dev/sdb is allowed

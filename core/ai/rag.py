@@ -101,13 +101,22 @@ Analyze the following preprocessed logs to perform a technical Root Cause Analys
         """
         Sanitizes, joins, and truncates logs if necessary.
         """
-        sanitized_logs = [str(log).strip() for log in (logs or []) if log is not None]
-        if not sanitized_logs:
+        if not logs:
             raise ValueError("logs must be a non-empty list of strings.")
 
+        # Filter out None and strip each log entry
+        sanitized_logs = [str(log).strip() for log in logs if log is not None]
+        if not sanitized_logs:
+            raise ValueError("logs must contain at least one valid string entry.")
+
         formatted_logs = "\n".join(sanitized_logs)
+
+        # Truncate if logs exceed the maximum allowed length
         if len(formatted_logs) > self.max_log_chars:
-            return f"... [truncated — showing last portion] ...\n{formatted_logs[-self.max_log_chars:]}"
+            return (
+                f"... [truncated — showing last {self.max_log_chars} characters] ...\n"
+                f"{formatted_logs[-self.max_log_chars:]}"
+            )
         return formatted_logs
 
     def build_prompt(
