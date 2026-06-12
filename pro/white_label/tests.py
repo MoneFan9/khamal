@@ -49,3 +49,15 @@ class WhiteLabelTests(TestCase):
         self.config1.refresh_from_db()
         self.assertTrue(self.config1.is_active)
         self.assertFalse(config2.is_active)
+
+    def test_switch_active_config(self):
+        """Test switching active status from one config to another."""
+        config2 = WhiteLabelConfiguration.objects.create(name="Config 2", is_active=False)
+        self.assertTrue(self.config1.is_active)
+
+        config2.is_active = True
+        config2.save()
+
+        self.config1.refresh_from_db()
+        self.assertFalse(self.config1.is_active)
+        self.assertTrue(config2.is_active)

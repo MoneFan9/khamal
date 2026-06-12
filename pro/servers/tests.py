@@ -50,3 +50,12 @@ class ServerAPITestCase(TestCase):
     def test_str_representation(self):
         server = Server.objects.create(**self.server_data)
         self.assertEqual(str(server), "Production Node 1 (192.168.1.100)")
+
+    def test_server_default_status(self):
+        server = Server.objects.create(name="Default Server", hostname_or_ip="10.0.0.1")
+        self.assertEqual(server.status, Server.Status.OFFLINE)
+        self.assertTrue(server.is_active)
+
+    def test_server_os_info_optional(self):
+        server = Server.objects.create(name="OS Info Test", hostname_or_ip="10.0.0.2")
+        self.assertIsNone(server.os_info)
