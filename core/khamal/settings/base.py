@@ -28,6 +28,11 @@ ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=[])
 
 
 # Application definition
+# Khamal follows a strict Open-Core architecture.
+# The /core directory contains the open-source engine (Apache 2.0).
+# The /pro directory contains proprietary extensions.
+# IMPORTANT: Code in /core MUST NEVER import from /pro.
+# Dependency injection and dynamic loading are used to bridge the two.
 
 INSTALLED_APPS = [
     "daphne",

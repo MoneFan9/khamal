@@ -22,7 +22,15 @@ bash scripts/install.sh
 - **Isolation** : Création d'un environnement virtuel Python (venv).
 - **Sécurité** : Déploiement d'un `docker-socket-proxy` pour isoler l'accès à l'API Docker.
 - **Routage** : Initialisation de Traefik pour la gestion automatique des certificats SSL (Let's Encrypt).
-- **Prêt pour l'IA** : Configuration des points de terminaison pour Ollama.
+- **Prêt pour l'IA** : Configuration des points de terminaison pour Ollama avec optimisation de la latence (`OLLAMA_KEEP_ALIVE`).
+
+## 🛡️ Sécurité Systémique & Isolation
+
+Khamal est conçu avec une approche "Security by Design" pour protéger l'hôte :
+- **Hardened Docker Client** : Un wrapper sécurisé qui intercepte les appels API Docker pour interdire les conteneurs privilégiés ou les escalades de capacités (`cap_add`).
+- **Docker Socket Proxy** : Khamal ne communique jamais directement avec `/var/run/docker.sock`. Il utilise un proxy agissant comme un pare-feu applicatif.
+- **Isolation Réseau** : Chaque projet dispose de son propre réseau bridge isolé. Seul le trafic web est routé via Traefik.
+- **Physical Ingestion Security** : L'importation via USB est protégée par **USBGuard** et des options de montage strictes (`noexec`, `nosuid`, `nodev`).
 
 ## 📂 Structure du Projet (Open-Core)
 
@@ -62,9 +70,14 @@ Nous encourageons la communauté à enrichir le cœur de Khamal.
    ```
 
 ### Règles d'Or
-- **Isolation du Core** : Le dossier `core/` ne doit **jamais** importer de modules provenant de `pro/`.
-- **Tests** : Toute nouvelle fonctionnalité dans le core doit être accompagnée de tests unitaires et d'intégration.
+- **Isolation du Core** : Le dossier `core/` ne doit **jamais** importer de modules provenant de `pro/`. Utilisez l'injection de dépendances si nécessaire.
+- **Security First** : Toute modification touchant à l'orchestration Docker doit passer par le `HardenedDockerClient`.
+- **Tests** : Toute nouvelle fonctionnalité dans le core doit être accompagnée de tests unitaires et d'intégration. Couverture cible : 100% sur les modules critiques.
 - **Documentation** : Documentez le "Pourquoi" derrière vos choix techniques dans les docstrings.
+
+## 🤝 Participer à l'aventure
+
+Nous croyons en une infrastructure souveraine et accessible. Que vous soyez expert Docker, développeur Python ou passionné d'IA, vos contributions sont les bienvenues. Consultez notre [Guide de Contribution](./CONTRIBUTING.md) (à venir) ou ouvrez une Issue pour discuter d'une amélioration.
 
 ## 📄 Licence
 - `/core` est sous licence [Apache 2.0](./core/LICENSE).

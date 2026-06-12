@@ -52,6 +52,11 @@ content = open('.env').read().replace('your-secret-key-here', '$SECRET')
 with open('.env', 'w') as f:
     f.write(content)
 "
+    # Set optimized Ollama defaults
+    if ! grep -q "OLLAMA_KEEP_ALIVE" .env; then
+        echo "OLLAMA_KEEP_ALIVE=30s" >> .env
+    fi
+
     echo -e "${GREEN}✅ .env created.${NC}"
 else
     echo "ℹ️  .env file already exists."
@@ -129,6 +134,27 @@ fi
 # Setup Traefik via management command
 echo "🌐 Setting up Traefik proxy..."
 python3 core/manage.py setup_traefik
+
+# 8. Post-Installation Health Check
+echo -e "${BLUE}🩺 Running post-installation health check...${NC}"
+HEALTH_CHECK_PASSED=true
+
+# Check if Docker containers are running
+if ! docker ps --filter "name=docker-socket-proxy" --quiet | grep -q . ; then
+    echo -e "${RED}❌ docker-socket-proxy is not running.${NC}"
+    HEALTH_CHECK_PASSED=false
+fi
+
+if ! docker ps --filter "name=khamal-traefik" --quiet | grep -q . ; then
+    echo -e "${RED}❌ khamal-traefik is not running.${NC}"
+    HEALTH_CHECK_PASSED=false
+fi
+
+if [ "$HEALTH_CHECK_PASSED" = true ]; then
+    echo -e "${GREEN}✅ Health check passed: Essential services are running.${NC}"
+else
+    echo -e "${YELLOW}⚠️  Health check issues detected. Please check logs.${NC}"
+fi
 
 echo "----------------------------------"
 echo -e "${GREEN}✅ Khamal installation completed successfully!${NC}"
