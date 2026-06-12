@@ -1,17 +1,50 @@
 import docker
 from django.conf import settings
 
-class HardenedContainerCollection:
+class HardenedContainer:
+    def __init__(self, container):
+        self._container = container
+
+    def exec_run(self, *args, **kwargs):
+        # Prevent privilege escalation in exec_run
+        if kwargs.get('privileged'):
+            raise PermissionError("Security Policy Violation: 'privileged=True' is forbidden in exec_run")
+        return self._container.exec_run(*args, **kwargs)
+
+    def __getattr__(self, name):
+        return getattr(self._container, name)
+
+class HardenedBaseCollection:
     def __init__(self, collection):
         self._collection = collection
 
+    def get(self, *args, **kwargs):
+        obj = self._collection.get(*args, **kwargs)
+        if isinstance(obj, docker.models.containers.Container):
+            return HardenedContainer(obj)
+        return obj
+
+    def list(self, *args, **kwargs):
+        objs = self._collection.list(*args, **kwargs)
+        return [HardenedContainer(o) if isinstance(o, docker.models.containers.Container) else o for o in objs]
+
+    def __getattr__(self, name):
+        return getattr(self._collection, name)
+
+class HardenedContainerCollection(HardenedBaseCollection):
     def run(self, *args, **kwargs):
         self._check_security_params(kwargs)
-        return self._collection.run(*args, **kwargs)
+        container = self._collection.run(*args, **kwargs)
+        if isinstance(container, docker.models.containers.Container):
+            return HardenedContainer(container)
+        return container
 
     def create(self, *args, **kwargs):
         self._check_security_params(kwargs)
-        return self._collection.create(*args, **kwargs)
+        container = self._collection.create(*args, **kwargs)
+        if isinstance(container, docker.models.containers.Container):
+            return HardenedContainer(container)
+        return container
 
     def _check_security_params(self, params):
         forbidden_params = {
@@ -26,20 +59,30 @@ class HardenedContainerCollection:
             for key, value in d.items():
                 if key in forbidden_params and value:
                     raise PermissionError(f"Security Policy Violation: Use of forbidden Docker parameter '{key}'")
+
+                # Check for sensitive host mounts
+                if key == 'volumes':
+                    if isinstance(value, dict):
+                        for host_path in value.keys():
+                            if any(sensitive in str(host_path) for sensitive in ['docker.sock', '/var/run']):
+                                 raise PermissionError(f"Security Policy Violation: Forbidden host mount detected: {host_path}")
+                    elif isinstance(value, list):
+                        for mount_spec in value:
+                            if any(sensitive in str(mount_spec) for sensitive in ['docker.sock', '/var/run']):
+                                 raise PermissionError(f"Security Policy Violation: Forbidden host mount detected: {mount_spec}")
+
                 if isinstance(value, dict):
                     _recursive_check(value)
 
         _recursive_check(params)
 
-    def __getattribute__(self, name):
-        if name in ['_collection', 'run', 'create', '_check_security_params']:
-            return super().__getattribute__(name)
-        return getattr(self._collection, name)
-
 class HardenedDockerClient:
     def __init__(self, client):
         self._client = client
         self.containers = HardenedContainerCollection(client.containers)
+        self.networks = HardenedBaseCollection(client.networks)
+        self.volumes = HardenedBaseCollection(client.volumes)
+        self.images = HardenedBaseCollection(client.images)
 
     def __getattribute__(self, name):
         if name in ['api', '_client']:
@@ -47,7 +90,8 @@ class HardenedDockerClient:
         return super().__getattribute__(name)
 
     def __getattr__(self, name):
-        return getattr(self._client, name)
+        client = super().__getattribute__('_client')
+        return getattr(client, name)
 
 def get_docker_client():
     """

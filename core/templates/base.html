@@ -10,19 +10,22 @@
     <style type="text/tailwindcss">
         @layer components {
             .btn-primary {
-                @apply inline-flex items-center px-5 py-2.5 border border-transparent text-sm font-semibold rounded-xl shadow-lg shadow-indigo-200 text-white bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all duration-300 hover:scale-[1.03] active:scale-95;
+                @apply inline-flex items-center px-6 py-3 border border-transparent text-sm font-black rounded-2xl shadow-2xl shadow-indigo-200 text-white bg-gradient-to-br from-indigo-600 via-indigo-700 to-violet-700 hover:from-indigo-500 hover:to-violet-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all duration-500 hover:scale-[1.05] hover:-translate-y-1 active:scale-95;
             }
             .pro-badge {
-                @apply ml-1 px-1.5 py-0.5 text-[10px] font-bold tracking-wider text-white bg-gradient-to-r from-orange-400 to-orange-500 rounded-full shadow-sm uppercase;
+                @apply ml-2 px-2 py-0.5 text-[9px] font-black tracking-widest text-white bg-gradient-to-r from-orange-500 to-amber-500 rounded-full shadow-[0_0_15px_rgba(249,115,22,0.4)] uppercase;
             }
             .nav-link {
-                @apply border-transparent text-slate-500 hover:text-indigo-600 hover:border-indigo-300 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium transition-all duration-300;
+                @apply border-transparent text-slate-500 hover:text-indigo-600 hover:border-indigo-300 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-bold transition-all duration-500;
             }
             .nav-link-active {
-                @apply border-indigo-600 text-slate-900 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-semibold transition-all duration-300;
+                @apply border-indigo-600 text-slate-900 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-black transition-all duration-500;
             }
             .glass-morphism {
-                @apply bg-white/70 backdrop-blur-md border-b border-white/20;
+                @apply bg-white/80 backdrop-blur-xl border-b border-white/20;
+            }
+            .premium-card {
+                @apply bg-white/70 backdrop-blur-lg border border-white/40 shadow-[0_20px_50px_rgba(0,0,0,0.02)] hover:shadow-[0_40px_80px_rgba(79,70,229,0.08)] transition-all duration-700;
             }
         }
     </style>
@@ -36,55 +39,57 @@
     </style>
     {% endif %}
 </head>
-<body class="h-full bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-slate-50 via-white to-indigo-50/30">
+<body class="h-full bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-indigo-50/50 via-white to-slate-50">
     <div class="min-h-full">
         <!-- Navigation -->
         <nav class="glass-morphism sticky top-0 z-50">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div class="flex justify-between h-20">
+                <div class="flex justify-between h-24">
                     <div class="flex">
                         <div class="flex-shrink-0 flex items-center">
-                            <a href="/" class="flex items-center space-x-2 transition-transform duration-300 hover:scale-105">
+                            <a href="/" class="flex items-center space-x-3 transition-all duration-500 hover:scale-105 group">
                                 {% if white_label_config and white_label_config.logo %}
-                                    <img src="{{ white_label_config.logo.url }}" alt="{{ white_label_config.name }}" class="h-12 w-auto">
+                                    <img src="{{ white_label_config.logo.url }}" alt="{{ white_label_config.name }}" class="h-14 w-auto">
                                 {% else %}
-                                    <div class="bg-indigo-600 rounded-xl p-1.5 shadow-indigo-200 shadow-lg">
-                                        <i class="fas fa-rocket text-white text-xl"></i>
+                                    <div class="bg-indigo-600 rounded-2xl p-2.5 shadow-indigo-300 shadow-2xl group-hover:rotate-12 transition-transform duration-500">
+                                        <i class="fas fa-rocket text-white text-2xl"></i>
                                     </div>
-                                    <span class="text-2xl font-black tracking-tight text-slate-900">Khamal</span>
+                                    <span class="text-3xl font-black tracking-tighter text-slate-900">Khamal</span>
                                 {% endif %}
                             </a>
                         </div>
-                        <div class="hidden sm:-my-px sm:ml-10 sm:flex sm:space-x-8">
+                        <div class="hidden sm:-my-px sm:ml-12 sm:flex sm:space-x-10">
                             <a href="/" class="nav-link-active" aria-current="page">
-                                Tableau de bord
+                                <i class="fas fa-th-large mr-2 text-indigo-500"></i> Tableau de bord
                             </a>
                             {% if is_pro_loaded %}
                                 <a href="/admin/pro_white_label/whitelabelconfiguration/" class="nav-link">
-                                    Design <span class="pro-badge">PRO</span>
+                                    <i class="fas fa-magic mr-2 text-orange-400"></i> Design <span class="pro-badge">PRO</span>
                                 </a>
                                 <a href="/api/servers/" class="nav-link">
-                                    Infrastructure <span class="pro-badge">PRO</span>
+                                    <i class="fas fa-server mr-2 text-indigo-400"></i> Infrastructure <span class="pro-badge">PRO</span>
                                 </a>
                             {% endif %}
                         </div>
                     </div>
-                    <div class="hidden sm:ml-6 sm:flex sm:items-center space-x-6">
+                    <div class="hidden sm:ml-6 sm:flex sm:items-center space-x-8">
                         {% if not is_pro_loaded %}
-                            <a href="https://khamal.io/pricing" class="btn-primary">
-                                Passer à la version Pro
+                            <a href="https://khamal.io/pricing" class="btn-primary group">
+                                <i class="fas fa-bolt mr-2 group-hover:animate-pulse"></i> Passer à la version Pro
                             </a>
                         {% endif %}
 
-                        <div class="flex items-center bg-slate-100 rounded-2xl px-4 py-2 border border-slate-200 shadow-sm">
-                            <i class="fas fa-user-circle text-indigo-500 text-xl mr-2"></i>
-                            <span class="text-slate-700 font-semibold text-sm">{{ user.username }}</span>
+                        <div class="flex items-center bg-white/50 backdrop-blur-sm rounded-2xl px-5 py-2.5 border border-slate-200 shadow-sm hover:border-indigo-200 transition-colors duration-500">
+                            <div class="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center mr-3">
+                                <i class="fas fa-user text-indigo-600 text-sm"></i>
+                            </div>
+                            <span class="text-slate-900 font-black text-sm tracking-tight">{{ user.username }}</span>
                         </div>
                     </div>
 
                     <!-- Mobile menu button -->
                     <div class="-mr-2 flex items-center sm:hidden">
-                        <button type="button" class="bg-slate-50 inline-flex items-center justify-center p-2.5 rounded-xl text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all border border-slate-200" aria-controls="mobile-menu" aria-expanded="false" onclick="toggleMobileMenu()">
+                        <button type="button" class="bg-white/80 backdrop-blur-sm inline-flex items-center justify-center p-3 rounded-2xl text-slate-600 hover:text-indigo-600 hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all border border-slate-200 shadow-sm" aria-controls="mobile-menu" aria-expanded="false" onclick="toggleMobileMenu()">
                             <span class="sr-only">Open main menu</span>
                             <i class="fas fa-bars text-xl" id="menu-icon"></i>
                         </button>
@@ -93,27 +98,29 @@
             </div>
 
             <!-- Mobile menu -->
-            <div class="hidden sm:hidden bg-white/95 backdrop-blur-xl border-b border-slate-200 shadow-2xl rounded-b-3xl overflow-hidden transition-all duration-500 ease-in-out mx-2" id="mobile-menu">
-                <div class="pt-4 pb-6 space-y-2 px-4">
-                    <a href="/" class="bg-indigo-600 text-white block px-4 py-4 text-base font-bold rounded-2xl shadow-lg shadow-indigo-100" aria-current="page">
-                        <i class="fas fa-home mr-3"></i> Tableau de bord
+            <div class="hidden sm:hidden bg-white/98 backdrop-blur-2xl border-b border-slate-200 shadow-2xl rounded-b-[2rem] overflow-hidden transition-all duration-500 ease-in-out mx-2 mt-2" id="mobile-menu">
+                <div class="pt-6 pb-8 space-y-3 px-6">
+                    <a href="/" class="bg-indigo-600 text-white block px-6 py-5 text-lg font-black rounded-2xl shadow-xl shadow-indigo-100" aria-current="page">
+                        <i class="fas fa-home mr-4"></i> Tableau de bord
                     </a>
                     {% if is_pro_loaded %}
-                        <a href="/admin/pro_white_label/whitelabelconfiguration/" class="text-slate-600 hover:bg-slate-50 block px-4 py-4 text-base font-semibold rounded-2xl transition-all">
-                            <i class="fas fa-paint-brush mr-3"></i> Design <span class="pro-badge">PRO</span>
+                        <a href="/admin/pro_white_label/whitelabelconfiguration/" class="text-slate-600 hover:bg-slate-50 block px-6 py-5 text-lg font-black rounded-2xl transition-all">
+                            <i class="fas fa-paint-brush mr-4 text-orange-500"></i> Design <span class="pro-badge">PRO</span>
                         </a>
-                        <a href="/api/servers/" class="text-slate-600 hover:bg-slate-50 block px-4 py-4 text-base font-semibold rounded-2xl transition-all">
-                            <i class="fas fa-server mr-3"></i> Infrastructure <span class="pro-badge">PRO</span>
+                        <a href="/api/servers/" class="text-slate-600 hover:bg-slate-50 block px-6 py-5 text-lg font-black rounded-2xl transition-all">
+                            <i class="fas fa-server mr-4 text-indigo-500"></i> Infrastructure <span class="pro-badge">PRO</span>
                         </a>
                     {% endif %}
-                    <div class="border-t border-slate-100 mt-4 pt-4">
-                         <div class="flex items-center px-4 py-3 bg-slate-50 rounded-2xl">
+                    <div class="border-t border-slate-100 mt-6 pt-6">
+                         <div class="flex items-center px-6 py-5 bg-slate-50/80 rounded-3xl border border-slate-100">
                             <div class="flex-shrink-0">
-                                <i class="fas fa-user-circle text-4xl text-indigo-400"></i>
+                                <div class="w-12 h-12 rounded-2xl bg-indigo-600 flex items-center justify-center shadow-lg">
+                                    <i class="fas fa-user text-white text-xl"></i>
+                                </div>
                             </div>
-                            <div class="ml-4">
-                                <div class="text-base font-bold text-slate-900">{{ user.username }}</div>
-                                <div class="text-sm font-medium text-slate-500">{{ user.email }}</div>
+                            <div class="ml-5">
+                                <div class="text-lg font-black text-slate-900 tracking-tight">{{ user.username }}</div>
+                                <div class="text-sm font-bold text-slate-500">{{ user.email|default:"Standard Account" }}</div>
                             </div>
                         </div>
                     </div>
@@ -121,22 +128,25 @@
             </div>
         </nav>
 
-        <header class="bg-white/40 border-b border-slate-100">
-            <div class="max-w-7xl mx-auto py-10 px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row justify-between items-center space-y-4 sm:space-y-0">
-                <div>
-                    <h1 class="text-4xl font-black text-slate-900 tracking-tight">
-                        {% block header_title %}Tableau de bord{% endblock %}
-                    </h1>
-                    <p class="text-slate-500 mt-1 font-medium">Gérez vos déploiements et votre infrastructure.</p>
-                </div>
-                <div class="flex items-center space-x-3">
-                    {% block header_actions %}{% endblock %}
+        <header class="relative overflow-hidden pt-16 pb-12">
+            <div class="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-indigo-50/40 via-transparent to-transparent -z-10"></div>
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex flex-col md:flex-row justify-between items-center md:items-end space-y-8 md:space-y-0">
+                    <div class="text-center md:text-left">
+                        <h1 class="text-5xl md:text-6xl font-black text-slate-900 tracking-tighter leading-none">
+                            {% block header_title %}Tableau de bord{% endblock %}
+                        </h1>
+                        <p class="text-slate-500 mt-4 text-lg md:text-xl font-medium max-w-2xl">Gérez vos déploiements et votre infrastructure en un clic.</p>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        {% block header_actions %}{% endblock %}
+                    </div>
                 </div>
             </div>
         </header>
 
-        <main>
-            <div class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        <main class="pb-24">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 {% block content %}{% endblock %}
             </div>
         </main>
