@@ -122,3 +122,10 @@ class TestLogSagePreprocessor(unittest.TestCase):
         # log 3 and log 2 should be more recent
         self.assertIn("INFO: log 3", processed)
         self.assertIn("INFO: log 2", processed)
+
+    def test_process_small_log_list(self):
+        # Case where len(deduplicated) <= self.max_output_lines
+        self.preprocessor = LogSagePreprocessor(max_output_lines=10)
+        logs = "INFO: single log line"
+        processed = self.preprocessor.process(logs)
+        self.assertEqual(processed, ["INFO: single log line"])
