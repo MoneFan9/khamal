@@ -1,14 +1,19 @@
 import pytest
 from django.urls import reverse
-from pro.white_label.models import WhiteLabelConfiguration
+from django.apps import apps
 
 @pytest.mark.django_db
 def test_white_label_css_injection_order(client):
     """
     Test that the White Label custom CSS is injected after the base styles.
     """
+    if not apps.is_installed("pro.white_label"):
+        pytest.skip("pro.white_label app not installed")
+
+    WhiteLabelConfigModel = apps.get_model("white_label", "WhiteLabelConfiguration")
+
     custom_css = ".custom-class { color: red; }"
-    WhiteLabelConfiguration.objects.create(
+    WhiteLabelConfigModel.objects.create(
         name="Test Config",
         custom_css=custom_css,
         is_active=True
