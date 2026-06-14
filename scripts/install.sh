@@ -35,12 +35,19 @@ if ! command -v python3 &> /dev/null; then
 fi
 
 if ! command -v nixpacks &> /dev/null; then
-    echo -e "${YELLOW}⚠️  Nixpacks is not installed. It is required for building images.${NC}"
-    echo "👉 Install it via: curl -sSL https://nixpacks.com/install.sh | bash"
+    echo -e "${YELLOW}⚠️  Nixpacks is not installed. Automated installation starting...${NC}"
+    curl -sSL https://nixpacks.com/install.sh | bash
+    echo -e "${GREEN}✅ Nixpacks installed successfully.${NC}"
+else
+    echo -e "${GREEN}✅ Nixpacks is already installed.${NC}"
 fi
 
 # 2. Environment Setup
 echo -e "${BLUE}📁 Setting up environment...${NC}"
+
+# We ensure DOCKER_URL is set to use the secure socket proxy by default.
+# This aligns with our security hardening model where the orchestrator
+# does not have direct access to /var/run/docker.sock.
 if [ ! -f .env ]; then
     echo "📝 Creating .env from .env.example..."
     cp core/.env.example .env
@@ -48,11 +55,27 @@ if [ ! -f .env ]; then
     SECRET=$(python3 -c 'import secrets; print(secrets.token_urlsafe(50))')
     python3 -c "
 import sys
-content = open('.env').read().replace('your-secret-key-here', '$SECRET')
+import os
+
+env_content = open('.env').read()
+env_content = env_content.replace('your-secret-key-here', '$SECRET')
+
+# Ensure DOCKER_URL points to the proxy for Plug & Play setup
+if 'DOCKER_URL=' in env_content:
+    lines = []
+    for line in env_content.splitlines():
+        if line.startswith('DOCKER_URL='):
+            lines.append('DOCKER_URL=tcp://127.0.0.1:2375')
+        else:
+            lines.append(line)
+    env_content = '\n'.join(lines)
+else:
+    env_content += '\nDOCKER_URL=tcp://127.0.0.1:2375'
+
 with open('.env', 'w') as f:
-    f.write(content)
+    f.write(env_content)
 "
-    echo -e "${GREEN}✅ .env created.${NC}"
+    echo -e "${GREEN}✅ .env created and configured for secure Docker access.${NC}"
 else
     echo "ℹ️  .env file already exists."
 fi
