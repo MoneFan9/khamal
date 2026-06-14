@@ -1,11 +1,12 @@
 from django.conf import settings
 from .docker_client import get_docker_client
-from .models import Project, Deployment
+from .models import Project, Deployment, DatabaseInstance, Backup
 from local.models import LocalSource
 import logging
 import docker
 import secrets
 import time
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -18,9 +19,9 @@ DATABASE_IMAGES = {
     "redis": "redis:7-alpine",
 }
 
-def _get_traefik_config() -> tuple[list[str], dict[str, dict]]:
+def _get_traefik_config() -> tuple[list[str], dict]:
     """
-    Returns the Traefik command-line arguments and volume mappings.
+    Returns the command and volumes for the global Traefik container.
     """
     command = [
         "--providers.docker=true",
@@ -43,6 +44,7 @@ def _get_traefik_config() -> tuple[list[str], dict[str, dict]]:
             "--entrypoints.web.http.redirections.entryPoint.to=websecure",
             "--entrypoints.web.http.redirections.entryPoint.scheme=https",
         ])
+        # Persist certificates
         volumes['khamal-letsencrypt'] = {'bind': '/letsencrypt', 'mode': 'rw'}
 
     return command, volumes
@@ -85,36 +87,6 @@ def ensure_global_proxy():
             command=command,
             labels={"khamal.managed": "true"}
         )
-
-def _get_traefik_config() -> tuple[list[str], dict]:
-    """
-    Returns the command and volumes for the global Traefik container.
-    """
-    command = [
-        "--providers.docker=true",
-        "--providers.docker.exposedbydefault=false",
-        f"--providers.docker.network={PROXY_NETWORK_NAME}",
-        "--entrypoints.web.address=:80",
-        "--entrypoints.websecure.address=:443",
-    ]
-
-    volumes = {
-        '/var/run/docker.sock': {'bind': '/var/run/docker.sock', 'mode': 'ro'}
-    }
-
-    if settings.KHAMAL_SSL_ENABLED:
-        command.extend([
-            "--certificatesresolvers.le.acme.email=" + settings.KHAMAL_ACME_EMAIL,
-            "--certificatesresolvers.le.acme.storage=" + settings.KHAMAL_ACME_STORAGE,
-            "--certificatesresolvers.le.acme.tlschallenge=true",
-            "--certificatesresolvers.le.acme.caserver=" + settings.KHAMAL_ACME_CA_SERVER,
-            "--entrypoints.web.http.redirections.entryPoint.to=websecure",
-            "--entrypoints.web.http.redirections.entryPoint.scheme=https",
-        ])
-        # Persist certificates
-        volumes['khamal-letsencrypt'] = {'bind': '/letsencrypt', 'mode': 'rw'}
-
-    return command, volumes
 
 def ensure_project_network(project: Project) -> str:
     """
@@ -400,7 +372,7 @@ def _wait_for_healthy(container, timeout: int = 60):
         time.sleep(2)
     return False
 
-def _get_db_config(engine: str, project_id: int) -> tuple[dict, dict]:
+def _get_db_config(engine: str, project_id: int, password: str) -> tuple[dict, dict]:
     """
     Returns the environment variables and volume mappings for the database engine.
     """
@@ -409,7 +381,7 @@ def _get_db_config(engine: str, project_id: int) -> tuple[dict, dict]:
         environment = {
             "POSTGRES_DB": "khamal",
             "POSTGRES_USER": "khamal",
-            "POSTGRES_PASSWORD": secrets.token_urlsafe(16)
+            "POSTGRES_PASSWORD": password
         }
 
     volumes = {
@@ -423,6 +395,7 @@ def _get_db_config(engine: str, project_id: int) -> tuple[dict, dict]:
 def provision_database(project: Project, engine: str):
     """
     Provisions a database container (PostgreSQL or Redis) for the project.
+    Persists credentials in a DatabaseInstance.
     """
     client = get_docker_client()
     project_network_id = ensure_project_network(project)
@@ -430,6 +403,16 @@ def provision_database(project: Project, engine: str):
 
     container_name = f"khamal-db-{engine}-{project.id}"
     image = DATABASE_IMAGES.get(engine, f"{engine}:latest")
+
+    # Persist or retrieve credentials
+    db_instance, created = DatabaseInstance.objects.get_or_create(
+        project=project,
+        engine=engine,
+        defaults={
+            "container_name": container_name,
+            "db_password": secrets.token_urlsafe(16),
+        }
+    )
 
     try:
         container = client.containers.get(container_name)
@@ -440,7 +423,7 @@ def provision_database(project: Project, engine: str):
     except docker.errors.NotFound:
         logger.info(f"Provisioning new {engine} container: {container_name}")
 
-    environment, volumes = _get_db_config(engine, project.id)
+    environment, volumes = _get_db_config(engine, project.id, db_instance.db_password)
 
     try:
         # SECURITY: Privileged mode and cap_add are strictly forbidden.
@@ -482,6 +465,156 @@ def auto_provision_from_plan(project: Project, plan):
 
     if plan.has_redis:
         provision_database(project, "redis")
+
+def backup_database(db_instance: DatabaseInstance) -> Backup:
+    """
+    Performs a database backup using streaming to prevent OOM.
+    """
+    backup = Backup.objects.create(db_instance=db_instance, status=Backup.Status.PENDING)
+    client = get_docker_client()
+
+    # Create backup directory if not exists
+    backup_dir = os.path.join(settings.BASE_DIR, "backups", str(db_instance.project.id))
+    os.makedirs(backup_dir, exist_ok=True)
+
+    timestamp = int(time.time())
+    file_name = f"backup-{db_instance.engine}-{timestamp}.dump"
+    file_path = os.path.join(backup_dir, file_name)
+
+    try:
+        container = client.containers.get(db_instance.container_name)
+
+        if db_instance.engine == "postgres":
+            # PostgreSQL backup via pg_dump
+            exec_command = [
+                "pg_dump",
+                "-U", db_instance.db_user,
+                "-d", db_instance.db_name,
+                "-Fc" # Custom format (compressed)
+            ]
+
+            # Using environment variables for password
+            env = {"PGPASSWORD": db_instance.db_password}
+
+            # Streaming execution
+            exec_id = client.api.exec_create(container.id, exec_command, environment=env)["Id"]
+            output_stream = client.api.exec_start(exec_id, stream=True)
+
+            with open(file_path, "wb") as f:
+                # Docker exec_start stream returns frames.
+                for chunk in docker.utils.socket.frames_iter(output_stream, tty=False):
+                    # frames_iter returns (stream_type, data)
+                    f.write(chunk[1])
+
+        elif db_instance.engine == "redis":
+            # Redis backup via BGSAVE and extraction
+            container.exec_run("redis-cli BGSAVE")
+
+            # Wait for BGSAVE to complete
+            deadline = time.monotonic() + 60
+            while time.monotonic() < deadline:
+                info = container.exec_run("redis-cli info Persistence").output.decode()
+                if "rdb_bgsave_in_progress:0" in info:
+                    break
+                time.sleep(1)
+
+            # Extract dump.rdb
+            strm, stat = container.get_archive("/data/dump.rdb")
+            with open(file_path, "wb") as f:
+                for chunk in strm:
+                    f.write(chunk)
+        else:
+            raise ValueError(f"Unsupported engine for backup: {db_instance.engine}")
+
+        backup.status = Backup.Status.COMPLETED
+        backup.file_path = file_path
+        backup.save()
+        logger.info(f"Backup completed for {db_instance}: {file_path}")
+        return backup
+
+    except Exception as e:
+        logger.error(f"Backup failed for {db_instance}: {e}")
+        backup.status = Backup.Status.FAILED
+        backup.error_message = str(e)
+        backup.save()
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        raise
+
+def restore_database(db_instance: DatabaseInstance, backup: Backup):
+    """
+    Restores a database from a backup.
+    """
+    if backup.status != Backup.Status.COMPLETED:
+        raise ValueError("Cannot restore from a non-completed backup.")
+
+    client = get_docker_client()
+    try:
+        container = client.containers.get(db_instance.container_name)
+
+        if db_instance.engine == "postgres":
+            # PostgreSQL restore via pg_restore
+            # We need to drop and recreate the DB or use --clean
+            exec_command = [
+                "pg_restore",
+                "-U", db_instance.db_user,
+                "-d", db_instance.db_name,
+                "--clean",
+                "--if-exists",
+                "--no-owner",
+                "--no-privileges"
+            ]
+
+            env = {"PGPASSWORD": db_instance.db_password}
+
+            # Create the exec instance
+            exec_id = client.api.exec_create(container.id, exec_command, environment=env, stdin=True)["Id"]
+
+            # Start and send data
+            sock = client.api.exec_start(exec_id, detach=False, socket=True)
+
+            with open(backup.file_path, "rb") as f:
+                # We need to wrap the data in Docker's multiplexed stream format if not using TTY
+                # Actually, for stdin it's simpler: just write to the socket.
+                # However, docker-py's socket might need careful handling.
+                # Simplified approach: use exec_run with data if it's not too big,
+                # but for OOM safety we should stream.
+
+                # Manual streaming to socket
+                import socket
+                if isinstance(sock, socket.socket):
+                    # Raw socket
+                    for chunk in iter(lambda: f.read(16384), b""):
+                        sock.sendall(chunk)
+                    sock.close()
+                else:
+                    # Wrapped socket (SocketIO)
+                    for chunk in iter(lambda: f.read(16384), b""):
+                        sock.write(chunk)
+                    sock.close()
+
+            # Check exit code
+            result = client.api.exec_inspect(exec_id)
+            if result["ExitCode"] != 0:
+                raise Exception(f"pg_restore failed with exit code {result['ExitCode']}")
+
+        elif db_instance.engine == "redis":
+            # Redis restore: stop, replace RDB, start
+            container.stop()
+
+            # The backup file is already a tar archive (from get_archive)
+            with open(backup.file_path, "rb") as f:
+                client.api.put_archive(container.id, "/data", f)
+
+            container.start()
+        else:
+            raise ValueError(f"Unsupported engine for restore: {db_instance.engine}")
+
+        logger.info(f"Restoration completed for {db_instance} from backup {backup.id}")
+
+    except Exception as e:
+        logger.error(f"Restoration failed for {db_instance}: {e}")
+        raise
 
 def get_deployment_logs(deployment: Deployment, tail: int = 1000) -> str:
     """
