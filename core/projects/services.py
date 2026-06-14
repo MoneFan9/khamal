@@ -18,35 +18,6 @@ DATABASE_IMAGES = {
     "redis": "redis:7-alpine",
 }
 
-def _get_traefik_config() -> tuple[list[str], dict[str, dict]]:
-    """
-    Returns the Traefik command-line arguments and volume mappings.
-    """
-    command = [
-        "--providers.docker=true",
-        "--providers.docker.exposedbydefault=false",
-        f"--providers.docker.network={PROXY_NETWORK_NAME}",
-        "--entrypoints.web.address=:80",
-        "--entrypoints.websecure.address=:443",
-    ]
-
-    volumes = {
-        '/var/run/docker.sock': {'bind': '/var/run/docker.sock', 'mode': 'ro'}
-    }
-
-    if settings.KHAMAL_SSL_ENABLED:
-        command.extend([
-            "--certificatesresolvers.le.acme.email=" + settings.KHAMAL_ACME_EMAIL,
-            "--certificatesresolvers.le.acme.storage=" + settings.KHAMAL_ACME_STORAGE,
-            "--certificatesresolvers.le.acme.tlschallenge=true",
-            "--certificatesresolvers.le.acme.caserver=" + settings.KHAMAL_ACME_CA_SERVER,
-            "--entrypoints.web.http.redirections.entryPoint.to=websecure",
-            "--entrypoints.web.http.redirections.entryPoint.scheme=https",
-        ])
-        volumes['khamal-letsencrypt'] = {'bind': '/letsencrypt', 'mode': 'rw'}
-
-    return command, volumes
-
 def ensure_global_proxy():
     """
     Ensures the global Traefik proxy and its network exist.
