@@ -129,16 +129,25 @@ class LogSagePreprocessor:
         # Re-sort chronologically
         return [logs[i] for i in sorted(list(selected_indices))]
 
-    def process(self, raw_logs: str) -> List[str]:
+    def process(self, raw_logs: str, max_input_lines: int = 2000) -> List[str]:
         """
         Main algorithm: filters noise, deduplicates, and prioritizes critical errors.
         Uses generators for memory efficiency.
+
+        Args:
+            raw_logs: The raw log string to process.
+            max_input_lines: Security cap to prevent OOM on massive log files.
         """
         if not raw_logs:
             return []
 
+        import io
         # Use generator expressions to reduce memory overhead
-        lines = (line.strip() for line in raw_logs.splitlines() if line.strip())
+        # Limit the number of lines read to prevent memory exhaustion
+        # Using io.StringIO to iterate over lines instead of materializing the full list
+        log_stream = io.StringIO(raw_logs)
+        lines = (line.strip() for i, line in enumerate(log_stream)
+                 if line.strip() and i < max_input_lines)
         filtered = (line for line in lines if not self.is_noise(line))
 
         # Deduplicate using a generator-friendly approach
@@ -151,13 +160,11 @@ class LogSagePreprocessor:
 
         deduplicated_gen = gen_deduplicate(filtered)
 
-        # Convert to list only when necessary for prioritization or if small enough
+        # Convert to list only when necessary for prioritization
         # We need a list for _prioritize_logs because it uses indices and multiple passes
         deduplicated = []
-        for i, log in enumerate(deduplicated_gen):
+        for log in deduplicated_gen:
             deduplicated.append(log)
-            # If we are already under the limit and only have a few more, we might still want to list it
-            # But the logic below will handle it.
 
         if len(deduplicated) <= self.max_output_lines:
             return deduplicated
