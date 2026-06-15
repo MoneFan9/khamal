@@ -156,4 +156,5 @@ KHAMAL_ACME_CA_SERVER = env("KHAMAL_ACME_CA_SERVER", default="https://acme-v02.a
 
 # Ollama Configuration
 OLLAMA_URL = env("OLLAMA_URL", default="http://localhost:11434")
-OLLAMA_KEEP_ALIVE = env("OLLAMA_KEEP_ALIVE", default="5m")
+# Optimized: reduce keep_alive to 1m to free RAM faster on 8GB machines
+OLLAMA_KEEP_ALIVE = env("OLLAMA_KEEP_ALIVE", default="1m")
