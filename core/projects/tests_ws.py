@@ -2,7 +2,7 @@ import pytest
 import json
 from channels.testing import WebsocketCommunicator
 from django.contrib.auth import get_user_model
-from core.khamal.asgi import application
+from khamal.asgi import application
 from projects.models import Project, Deployment
 from unittest.mock import patch, MagicMock
 

@@ -1,8 +1,8 @@
 import unittest
 from unittest.mock import patch, MagicMock
-from core.ai.client import OllamaClient
-from core.ai.rag import RCAPromptBuilder
-from core.ai.tools import get_available_tools, PROPOSE_FIX_TOOL
+from ai.client import OllamaClient
+from ai.rag import RCAPromptBuilder
+from ai.tools import get_available_tools, PROPOSE_FIX_TOOL
 
 class TestToolCalling(unittest.TestCase):
     def setUp(self):

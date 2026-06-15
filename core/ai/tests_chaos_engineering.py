@@ -2,10 +2,10 @@ import unittest
 import tempfile
 import shutil
 from pathlib import Path
-from core.ai.logsage import LogSagePreprocessor
-from core.ai.rag import RCAPromptBuilder
-from core.ai.executor import apply_fix
-from core.ai.chaos_simulations import ChaosGenerator
+from ai.logsage import LogSagePreprocessor
+from ai.rag import RCAPromptBuilder
+from ai.executor import apply_fix
+from ai.chaos_simulations import ChaosGenerator
 
 class TestChaosEngineering(unittest.TestCase):
     """
