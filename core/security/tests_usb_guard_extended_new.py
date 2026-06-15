@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import patch, MagicMock
 import subprocess
-from core.security.usb_guard import USBGuardManager
+from security.usb_guard import USBGuardManager
 
 def test_generate_policy_failure():
     with patch("subprocess.run") as mock_run:
