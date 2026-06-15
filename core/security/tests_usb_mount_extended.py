@@ -19,6 +19,19 @@ class TestUSBMountExtended:
         result = USBMountManager.mount_volume("/dev/sdb1", "/mnt/usb/stick")
         assert result is False
 
+    @patch("security.usb_mount.os.path.commonpath")
+    def test_mount_volume_invalid_device_path(self, mock_commonpath):
+        mock_commonpath.return_value = "/not_dev"
+        result = USBMountManager.mount_volume("/dev/sdb1", "/mnt/usb/stick")
+        assert result is False
+
+    @patch("security.usb_mount.os.path.commonpath")
+    def test_mount_volume_invalid_mount_point(self, mock_commonpath):
+        # Bypass the first check
+        mock_commonpath.side_effect = ["/dev", "/not_mnt"]
+        result = USBMountManager.mount_volume("/dev/sdb1", "/mnt/usb/stick")
+        assert result is False
+
     @patch("security.usb_mount.USBGuardManager.is_installed")
     def test_mount_volume_outside_allowed_base(self, mock_is_installed):
         mock_is_installed.return_value = True
@@ -40,6 +53,12 @@ class TestUSBMountExtended:
         assert result is False
 
     @patch("security.usb_mount.USBGuardManager.is_installed")
+    def test_mount_volume_usbguard_not_installed(self, mock_is_installed):
+        mock_is_installed.return_value = False
+        result = USBMountManager.mount_volume("/dev/sdb1", "/mnt/usb/stick")
+        assert result is False
+
+    @patch("security.usb_mount.USBGuardManager.is_installed")
     @patch("security.usb_mount.os.path.exists")
     @patch("security.usb_mount.os.makedirs")
     def test_mount_volume_makedirs_oserror(self, mock_makedirs, mock_exists, mock_is_installed):
@@ -47,4 +66,20 @@ class TestUSBMountExtended:
         mock_exists.return_value = False
         mock_makedirs.side_effect = OSError("Permission denied")
         result = USBMountManager.mount_volume("/dev/sdb1", "/mnt/usb/stick")
+        assert result is False
+
+    @patch("security.usb_mount.USBGuardManager.is_installed")
+    @patch("security.usb_mount.os.path.exists")
+    @patch("security.usb_mount.subprocess.run")
+    def test_mount_volume_mount_failure(self, mock_run, mock_exists, mock_is_installed):
+        mock_is_installed.return_value = True
+        mock_exists.return_value = True
+        mock_run.side_effect = subprocess.CalledProcessError(1, "mount", stderr="Mount failed")
+        result = USBMountManager.mount_volume("/dev/sdb1", "/mnt/usb/stick")
+        assert result is False
+
+    @patch("security.usb_mount.subprocess.run")
+    def test_unmount_volume_failure(self, mock_run):
+        mock_run.side_effect = subprocess.CalledProcessError(1, "umount", stderr="Unmount failed")
+        result = USBMountManager.unmount_volume("/mnt/usb/stick")
         assert result is False
