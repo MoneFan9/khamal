@@ -31,9 +31,7 @@ class HardenedContainerCollection:
 
         _recursive_check(params)
 
-    def __getattribute__(self, name):
-        if name in ['_collection', 'run', 'create', '_check_security_params']:
-            return super().__getattribute__(name)
+    def __getattr__(self, name):
         return getattr(self._collection, name)
 
 class HardenedDockerClient:
