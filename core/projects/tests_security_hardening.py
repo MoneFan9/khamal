@@ -50,14 +50,14 @@ class SecurityHardeningTests(TestCase):
     @patch("security.usb_mount.USBGuardManager.list_devices")
     @patch("security.usb_mount.USBGuardManager.is_service_active")
     @patch("security.usb_mount.USBGuardManager.is_installed")
-    @patch("os.path.exists")
-    @patch("os.makedirs")
-    @patch("subprocess.run")
+    @patch("security.usb_mount.os.path.exists")
+    @patch("security.usb_mount.os.makedirs")
+    @patch("security.usb_mount.subprocess.run")
     def test_usb_mount_valid(self, mock_run, mock_makedirs, mock_exists, mock_usbguard, mock_active, mock_list, mock_block):
         """Test USBMountManager with valid parameters and verify flags."""
         mock_usbguard.return_value = True
         mock_active.return_value = True
-        mock_list.return_value = "allow /dev/sdb1"
+        mock_list.return_value = "1: allow id 1234:5678 ... with-devpath \"/dev/sdb1\""
         mock_block.return_value = True
         mock_exists.return_value = False
         mock_run.return_value = MagicMock(returncode=0)

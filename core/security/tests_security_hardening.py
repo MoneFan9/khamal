@@ -54,13 +54,13 @@ class SecurityHardeningTests(TestCase):
         result = USBMountManager.mount_volume("/dev/sdb1", "/mnt/usb/stick")
         self.assertFalse(result)
 
-    @patch("security.usb_mount.Path.is_block_device")
-    @patch("security.usb_mount.USBGuardManager.list_devices")
-    @patch("security.usb_mount.USBGuardManager.is_service_active")
-    @patch("security.usb_mount.USBGuardManager.is_installed")
     @patch("security.usb_mount.subprocess.run")
     @patch("security.usb_mount.os.makedirs")
-    def test_mount_options_applied(self, mock_makedirs, mock_run, mock_installed, mock_active, mock_list, mock_block):
+    @patch("security.usb_mount.USBGuardManager.is_installed")
+    @patch("security.usb_mount.USBGuardManager.is_service_active")
+    @patch("security.usb_mount.USBGuardManager.list_devices")
+    @patch("security.usb_mount.Path.is_block_device")
+    def test_mount_options_applied(self, mock_block, mock_list, mock_active, mock_installed, mock_makedirs, mock_run):
         mock_installed.return_value = True
         mock_active.return_value = True
         mock_block.return_value = True

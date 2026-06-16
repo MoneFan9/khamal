@@ -70,14 +70,14 @@ class USBGuardTests(TestCase):
 
 class USBMountTests(TestCase):
 
-    @patch("security.usb_mount.Path.is_block_device")
-    @patch("security.usb_mount.USBGuardManager.list_devices")
-    @patch("security.usb_mount.USBGuardManager.is_service_active")
-    @patch("security.usb_mount.USBGuardManager.is_installed")
-    @patch("os.path.exists")
+    @patch("security.usb_mount.subprocess.run")
     @patch("os.makedirs")
-    @patch("subprocess.run")
-    def test_mount_volume_success(self, mock_run, mock_makedirs, mock_exists, mock_usbguard, mock_active, mock_list, mock_block):
+    @patch("os.path.exists")
+    @patch("security.usb_mount.USBGuardManager.is_installed")
+    @patch("security.usb_mount.USBGuardManager.is_service_active")
+    @patch("security.usb_mount.USBGuardManager.list_devices")
+    @patch("security.usb_mount.Path.is_block_device")
+    def test_mount_volume_success(self, mock_block, mock_list, mock_active, mock_usbguard, mock_exists, mock_makedirs, mock_run):
         mock_usbguard.return_value = True
         mock_active.return_value = True
         mock_list.return_value = "1: allow id 1234:5678 serial \"\" name \"\" hash \"\" parent-hash \"\" via-port \"usb1\" with-interface { 08:06:50 } with-connect-type \"\" with-devpath \"/dev/sdb1\""
@@ -94,16 +94,16 @@ class USBMountTests(TestCase):
             check=True, capture_output=True, text=True
         )
 
-    @patch("security.usb_mount.Path.is_block_device")
-    @patch("security.usb_mount.USBGuardManager.list_devices")
-    @patch("security.usb_mount.USBGuardManager.is_service_active")
-    @patch("security.usb_mount.USBGuardManager.is_installed")
+    @patch("security.usb_mount.subprocess.run")
     @patch("os.path.exists")
-    @patch("subprocess.run")
-    def test_mount_volume_failure(self, mock_run, mock_exists, mock_usbguard, mock_active, mock_list, mock_block):
+    @patch("security.usb_mount.USBGuardManager.is_installed")
+    @patch("security.usb_mount.USBGuardManager.is_service_active")
+    @patch("security.usb_mount.USBGuardManager.list_devices")
+    @patch("security.usb_mount.Path.is_block_device")
+    def test_mount_volume_failure(self, mock_block, mock_list, mock_active, mock_usbguard, mock_exists, mock_run):
         mock_usbguard.return_value = True
         mock_active.return_value = True
-        mock_list.return_value = "allow /dev/sdb1"
+        mock_list.return_value = "1: allow id 1234:5678 ... with-devpath \"/dev/sdb1\""
         mock_block.return_value = True
         mock_exists.return_value = True
         mock_run.side_effect = subprocess.CalledProcessError(1, "mount", stderr="Permission denied")
@@ -150,10 +150,16 @@ class USBMountTests(TestCase):
         mock_installed.return_value = False
         self.assertFalse(USBMountManager.mount_volume("/dev/sdb1", "/mnt/usb/stick"))
 
-    @patch("security.usb_mount.USBGuardManager.is_installed")
-    @patch("os.makedirs")
     @patch("os.path.exists")
-    def test_mount_volume_makedirs_failure(self, mock_exists, mock_makedirs, mock_installed):
+    @patch("os.makedirs")
+    @patch("security.usb_mount.USBGuardManager.is_installed")
+    @patch("security.usb_mount.USBGuardManager.is_service_active")
+    @patch("security.usb_mount.USBGuardManager.list_devices")
+    @patch("security.usb_mount.Path.is_block_device")
+    def test_mount_volume_makedirs_failure(self, mock_block, mock_list, mock_active, mock_installed, mock_makedirs, mock_exists):
+        mock_block.return_value = True
+        mock_active.return_value = True
+        mock_list.return_value = "1: allow id 1234:5678 ... with-devpath \"/dev/sdb1\""
         mock_installed.return_value = True
         mock_exists.return_value = False
         mock_makedirs.side_effect = OSError("Permission denied")
