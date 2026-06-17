@@ -98,6 +98,29 @@ class USBMountTests(TestCase):
     @patch("security.usb_mount.USBGuardManager.list_devices")
     @patch("security.usb_mount.USBGuardManager.is_service_active")
     @patch("security.usb_mount.USBGuardManager.is_installed")
+    def test_mount_volume_not_block_device(self, mock_installed, mock_active, mock_list, mock_block):
+        mock_installed.return_value = True
+        mock_active.return_value = True
+        mock_block.return_value = False
+
+        result = USBMountManager.mount_volume("/dev/sdb1", "/mnt/usb/stick")
+        self.assertFalse(result)
+
+    @patch("os.path.realpath")
+    def test_mount_volume_symlink_resolution(self, mock_realpath):
+        # /dev/usb-stick -> /dev/sdb1
+        # /mnt/usb/stick -> /mnt/usb/stick
+        mock_realpath.side_effect = ["/dev/sdb1", "/mnt/usb/stick", "/mnt/usb"]
+
+        with patch("security.usb_mount.USBMountManager.mount_volume") as mock_mount:
+             # We just want to check if _validate_paths uses realpath
+             USBMountManager._validate_paths("/dev/usb-stick", "/mnt/usb/stick")
+             self.assertEqual(mock_realpath.call_count, 3)
+
+    @patch("security.usb_mount.Path.is_block_device")
+    @patch("security.usb_mount.USBGuardManager.list_devices")
+    @patch("security.usb_mount.USBGuardManager.is_service_active")
+    @patch("security.usb_mount.USBGuardManager.is_installed")
     @patch("os.path.exists")
     @patch("subprocess.run")
     def test_mount_volume_failure(self, mock_run, mock_exists, mock_usbguard, mock_active, mock_list, mock_block):

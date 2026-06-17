@@ -136,3 +136,9 @@ Analyze the following preprocessed logs to perform a technical Root Cause Analys
             f"enable_tools={self.enable_tools}, "
             f"custom_system_prompt={self.system_prompt not in (self.SYSTEM_PROMPT, self.TOOL_ENABLED_SYSTEM_PROMPT)})"
         )
+
+    def get_system_prompt(self) -> str:
+        """
+        Returns the current system prompt.
+        """
+        return self.system_prompt
