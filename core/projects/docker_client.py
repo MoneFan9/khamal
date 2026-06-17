@@ -17,23 +17,46 @@ class HardenedContainerCollection:
         forbidden_params = {
             'privileged', 'cap_add', 'security_opt', 'userns_mode',
             'pid_mode', 'group_add', 'oom_kill_disable', 'devices',
-            'device_cgroup_rules'
+            'device_cgroup_rules', 'network_mode', 'ipc_mode', 'uts_mode',
+            'sysctls'
         }
 
         def _recursive_check(d):
-            if not isinstance(d, dict):
-                return
-            for key, value in d.items():
-                if key in forbidden_params and value:
-                    raise PermissionError(f"Security Policy Violation: Use of forbidden Docker parameter '{key}'")
-                if isinstance(value, dict):
-                    _recursive_check(value)
+            if isinstance(d, dict):
+                for key, value in d.items():
+                    if key in forbidden_params and value:
+                        raise PermissionError(f"Security Policy Violation: Use of forbidden Docker parameter '{key}'")
+
+                    # Check for sensitive volume mounts
+                    if key == 'volumes':
+                        self._validate_volumes(value)
+
+                    if isinstance(value, (dict, list)):
+                        _recursive_check(value)
+            elif isinstance(d, list):
+                for item in d:
+                    _recursive_check(item)
 
         _recursive_check(params)
 
-    def __getattribute__(self, name):
-        if name in ['_collection', 'run', 'create', '_check_security_params']:
-            return super().__getattribute__(name)
+    def _validate_volumes(self, volumes):
+        """
+        Prevents mounting sensitive host paths like the Docker socket.
+        """
+        sensitive_paths = {'/var/run/docker.sock', '/var/run/docker.sock/'}
+
+        if isinstance(volumes, dict):
+            for host_path in volumes.keys():
+                if host_path in sensitive_paths:
+                    raise PermissionError(f"Security Policy Violation: Mounting sensitive path '{host_path}' is forbidden.")
+        elif isinstance(volumes, list):
+            for volume_str in volumes:
+                # Format: host_path:container_path:mode
+                host_path = volume_str.split(':')[0]
+                if host_path in sensitive_paths:
+                    raise PermissionError(f"Security Policy Violation: Mounting sensitive path '{host_path}' is forbidden.")
+
+    def __getattr__(self, name):
         return getattr(self._collection, name)
 
 class HardenedDockerClient:
