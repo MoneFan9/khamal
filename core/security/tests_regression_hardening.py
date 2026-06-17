@@ -56,21 +56,23 @@ class RegressionSecurityHardeningTests(TestCase):
         result = USBMountManager.mount_volume("/dev/sdb", "/mnt/usb/stick")
         self.assertFalse(result, "Should not allow /dev/sdb when only /dev/sdb1 is authorized")
 
+    @patch("security.usb_mount.os.path.realpath")
     @patch("security.usb_mount.Path.is_block_device")
     @patch("security.usb_mount.USBGuardManager.list_devices")
     @patch("security.usb_mount.USBGuardManager.is_service_active")
     @patch("security.usb_mount.USBGuardManager.is_installed")
     @patch("security.usb_mount.subprocess.run")
     @patch("security.usb_mount.os.makedirs")
-    def test_usb_mount_parent_authorization_valid(self, mock_makedirs, mock_run, mock_installed, mock_active, mock_list, mock_block):
-        """Verify that allowing the parent device allows mounting the partition."""
+    def test_usb_mount_parent_authorization_valid(self, mock_makedirs, mock_run, mock_installed, mock_active, mock_list, mock_block, mock_realpath):
+        """Verify that allowing the partition device allows mounting the partition."""
+        mock_realpath.side_effect = lambda x: x
         mock_installed.return_value = True
         mock_active.return_value = True
         mock_block.return_value = True
         mock_run.return_value = MagicMock(returncode=0)
 
-        # /dev/sdb is allowed
-        mock_list.return_value = "1: allow id 1234:5678 ... with-devpath \"/dev/sdb\""
+        # /dev/sdb1 is allowed
+        mock_list.return_value = "1: allow id 1234:5678 ... with-devpath \"/dev/sdb1\""
 
         # Mounting /dev/sdb1 should be allowed
         result = USBMountManager.mount_volume("/dev/sdb1", "/mnt/usb/stick")

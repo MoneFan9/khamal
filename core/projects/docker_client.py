@@ -17,7 +17,8 @@ class HardenedContainerCollection:
         forbidden_params = {
             'privileged', 'cap_add', 'security_opt', 'userns_mode',
             'pid_mode', 'group_add', 'oom_kill_disable', 'devices',
-            'device_cgroup_rules'
+            'device_cgroup_rules', 'network_mode', 'ipc_mode', 'uts_mode',
+            'sysctls'
         }
 
         def _recursive_check(d):
@@ -31,9 +32,7 @@ class HardenedContainerCollection:
 
         _recursive_check(params)
 
-    def __getattribute__(self, name):
-        if name in ['_collection', 'run', 'create', '_check_security_params']:
-            return super().__getattribute__(name)
+    def __getattr__(self, name):
         return getattr(self._collection, name)
 
 class HardenedDockerClient:
@@ -47,7 +46,7 @@ class HardenedDockerClient:
         return super().__getattribute__(name)
 
     def __getattr__(self, name):
-        return getattr(self._client, name)
+        return getattr(super().__getattribute__('_client'), name)
 
 def get_docker_client():
     """

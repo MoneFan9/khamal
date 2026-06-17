@@ -46,6 +46,7 @@ class SecurityHardeningTests(TestCase):
         self.assertFalse(serializer.is_valid())
         self.assertIn('host_path', serializer.errors)
 
+    @patch("os.path.realpath")
     @patch("security.usb_mount.Path.is_block_device")
     @patch("security.usb_mount.USBGuardManager.list_devices")
     @patch("security.usb_mount.USBGuardManager.is_service_active")
@@ -53,11 +54,12 @@ class SecurityHardeningTests(TestCase):
     @patch("os.path.exists")
     @patch("os.makedirs")
     @patch("subprocess.run")
-    def test_usb_mount_valid(self, mock_run, mock_makedirs, mock_exists, mock_usbguard, mock_active, mock_list, mock_block):
+    def test_usb_mount_valid(self, mock_run, mock_makedirs, mock_exists, mock_usbguard, mock_active, mock_list, mock_block, mock_realpath):
         """Test USBMountManager with valid parameters and verify flags."""
+        mock_realpath.side_effect = lambda x: x
         mock_usbguard.return_value = True
         mock_active.return_value = True
-        mock_list.return_value = "allow /dev/sdb1"
+        mock_list.return_value = "1: allow id 1234:5678 with-devpath \"/dev/sdb1\""
         mock_block.return_value = True
         mock_exists.return_value = False
         mock_run.return_value = MagicMock(returncode=0)
@@ -136,3 +138,15 @@ class SecurityHardeningTests(TestCase):
         with self.assertRaises(PermissionError) as cm:
             client.containers.create("alpine", cap_add=["NET_ADMIN"])
         self.assertIn("cap_add", str(cm.exception))
+
+    @patch("projects.docker_client.docker.DockerClient")
+    def test_docker_extra_hardened_params_blocked(self, mock_docker):
+        """Test that the hardened Docker client blocks network_mode, ipc_mode, uts_mode, and sysctls."""
+        from projects.docker_client import get_docker_client
+        client = get_docker_client()
+
+        for param in ['network_mode', 'ipc_mode', 'uts_mode', 'sysctls']:
+            with self.subTest(param=param):
+                with self.assertRaises(PermissionError) as cm:
+                    client.containers.run("alpine", **{param: "host" if param != 'sysctls' else {"net.ipv4.ip_forward": 1}})
+                self.assertIn(param, str(cm.exception))
