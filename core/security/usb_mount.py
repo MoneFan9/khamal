@@ -65,8 +65,13 @@ class USBMountManager:
         """
         # --- Security Hardening Protocol ---
         # 1. Path Normalization & Validation
-        is_valid, device_path, mount_point = USBMountManager._validate_paths(device_path, mount_point)
+        is_valid, normalized_device, normalized_mount = USBMountManager._validate_paths(device_path, mount_point)
         if not is_valid:
+            return False
+
+        # 2. Verify it's a block device
+        if not Path(normalized_device).is_block_device():
+            logger.error(f"Device {normalized_device} is not a valid block device.")
             return False
 
         # 4. Integrate with USBGuard
@@ -102,10 +107,10 @@ class USBMountManager:
                 break
 
         if not authorized:
-             logger.error(f"Device {device_path} is not authorized by USBGuard.")
+             logger.error(f"Device {normalized_device} is not authorized by USBGuard.")
              return False
 
-        if not os.path.exists(mount_point):
+        if not os.path.exists(normalized_mount):
             try:
                 os.makedirs(normalized_mount, exist_ok=True)
             except OSError as e:
@@ -118,12 +123,12 @@ class USBMountManager:
         mount_options = "noexec,nosuid,nodev"
 
         try:
-            command = ["sudo", "mount", "-o", mount_options, device_path, normalized_mount]
+            command = ["sudo", "mount", "-o", mount_options, normalized_device, normalized_mount]
             subprocess.run(command, check=True, capture_output=True, text=True)
-            logger.info(f"Successfully mounted {device_path} to {normalized_mount} with security options.")
+            logger.info(f"Successfully mounted {normalized_device} to {normalized_mount} with security options.")
             return True
         except subprocess.CalledProcessError as e:
-            logger.error(f"Failed to mount {device_path} to {normalized_mount}: {e.stderr}")
+            logger.error(f"Failed to mount {normalized_device} to {normalized_mount}: {e.stderr}")
             return False
 
     @staticmethod

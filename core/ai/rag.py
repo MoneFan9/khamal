@@ -97,6 +97,12 @@ Analyze the following preprocessed logs to perform a technical Root Cause Analys
             context.update({k: v for k, v in project_context.items() if k in self.KNOWN_CONTEXT_KEYS})
         return context
 
+    def get_system_prompt(self) -> str:
+        """
+        Returns the system prompt currently in use.
+        """
+        return self.system_prompt
+
     def _format_logs(self, logs: list[str]) -> str:
         """
         Sanitizes, joins, and truncates logs if necessary.
