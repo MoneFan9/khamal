@@ -25,6 +25,7 @@ class RegressionSecurityHardeningTests(TestCase):
             _ = client.api
         self.assertIn("Direct access to low-level Docker API 'api' is restricted", str(cm.exception))
 
+        # _client is restricted in __getattribute__
         with self.assertRaises(PermissionError) as cm:
             _ = client._client
         self.assertIn("Direct access to low-level Docker API '_client' is restricted", str(cm.exception))
