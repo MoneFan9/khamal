@@ -14,30 +14,32 @@ git clone https://github.com/your-repo/khamal.git
 cd khamal
 
 # Lancez l'installation automatique (Zero-Config)
+# Ce script installe Nixpacks, configure venv, sécurise Docker et initialise Traefik.
 bash scripts/install.sh
 ```
 
 ### Ce que fait l'installateur pour vous :
-- **Vérification des prérequis** : Docker, Python 3 et Nixpacks.
+- **Vérification & Installation des prérequis** : Docker, Python 3 et installation automatique de **Nixpacks**.
 - **Isolation** : Création d'un environnement virtuel Python (venv).
-- **Sécurité** : Déploiement d'un `docker-socket-proxy` pour isoler l'accès à l'API Docker.
-- **Routage** : Initialisation de Traefik pour la gestion automatique des certificats SSL (Let's Encrypt).
-- **Prêt pour l'IA** : Configuration des points de terminaison pour Ollama.
+- **Sécurité par Design** : Déploiement automatique de `docker-socket-proxy` pour isoler l'API Docker du moteur d'orchestration.
+- **Routage Intelligent** : Initialisation de Traefik v3 pour la gestion automatique des certificats SSL et du routage par projet.
+- **Auto-Configuration** : Génération de clés secrètes et de chemins d'administration sécurisés (Hidden Admin).
 
 ## 📂 Structure du Projet (Open-Core)
 
 Khamal suit un modèle **Open-Core** strict pour garantir une base saine et extensible :
 
-- **[/core](./core) :** Le moteur open-source. Gestion des cycles de vie des conteneurs, orchestration réseau isolée, intégration Nixpacks, et moteur LogSage. **Licence Apache 2.0**.
+- **[/core](./core) :** Le moteur open-source. Gestion des cycles de vie des conteneurs (Hardened Docker), orchestration réseau isolée, intégration Nixpacks avec auto-provisioning de DB, et moteur LogSage. **Licence Apache 2.0**.
 - **[/pro](./pro) :** Extensions professionnelles. Gestion multi-nœuds (cluster), Marque Blanche (White-labeling), et intégrations SSO. **Licence Propriétaire**.
 
 ## 🧠 Intelligence de Diagnostic : LogSage
 
-L'une des innovations majeures de Khamal est **LogSage**, un moteur de diagnostic basé sur l'IA locale (Llama 3.2 / Qwen 2.5 Coder via Ollama).
+Khamal intègre **LogSage**, un moteur de diagnostic utilisant la stratégie **MPPS (Multi-Phase Prioritization Strategy)** pour l'analyse de crash via IA locale.
 
-- **Réduction de Bruit** : Filtre intelligemment les logs non pertinents pour ne garder que le contexte critique.
-- **Analyse de Crash** : Identifie la cause racine d'un échec de déploiement.
-- **Correctifs Applicables** : Génère des suggestions de code directement applicables pour corriger les erreurs de configuration ou de dépendances.
+- **Filtrage Intelligent** : Élimine le bruit (heartbeats, healthchecks) pour maximiser la densité sémantique.
+- **Analyse MPPS** : Priorise les "Anchors" (erreurs critiques) et leur contexte immédiat pour une précision accrue avec des modèles locaux (Llama 3.2, Qwen 2.5 Coder).
+- **Auto-Provisioning** : Détecte et déploie automatiquement les dépendances (PostgreSQL, Redis, etc.) via Nixpacks.
+- **Correctifs Actionnables** : Propose des solutions concrètes aux échecs de build ou de runtime.
 
 ## 🏗️ Architecture Technique
 

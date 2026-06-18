@@ -2,6 +2,13 @@ import docker
 from django.conf import settings
 
 class HardenedContainerCollection:
+    """
+    HardenedContainerCollection: A security wrapper for Docker container operations.
+
+    This class enforces the "No-Escalation" policy by intercepting container creation
+    and execution requests. It ensures that no user-defined container can be launched
+    with dangerous privileges that could lead to host compromise.
+    """
     def __init__(self, collection):
         self._collection = collection
 
@@ -14,10 +21,15 @@ class HardenedContainerCollection:
         return self._collection.create(*args, **kwargs)
 
     def _check_security_params(self, params):
+        """
+        Validates that no forbidden security parameters are used.
+        We block privileged mode, capability additions, and host namespace sharing.
+        """
         forbidden_params = {
             'privileged', 'cap_add', 'security_opt', 'userns_mode',
             'pid_mode', 'group_add', 'oom_kill_disable', 'devices',
-            'device_cgroup_rules'
+            'device_cgroup_rules', 'network_mode', 'ipc_mode',
+            'uts_mode', 'sysctls'
         }
 
         def _recursive_check(d):
@@ -37,17 +49,28 @@ class HardenedContainerCollection:
         return getattr(self._collection, name)
 
 class HardenedDockerClient:
+    """
+    HardenedDockerClient: The primary interface for secure Docker orchestration.
+
+    This client wraps the standard Docker SDK to provide:
+    1. Attribute Masking: Prevents access to the low-level '.api' object which bypasses security checks.
+    2. Hardened Collections: Replaces standard collections (like 'containers') with secure versions.
+    3. Proxy Enforcement: Designed to work in tandem with 'docker-socket-proxy'.
+    """
     def __init__(self, client):
         self._client = client
         self.containers = HardenedContainerCollection(client.containers)
 
     def __getattribute__(self, name):
+        # Prevent access to the underlying client or low-level API to maintain the security boundary.
         if name in ['api', '_client']:
              raise PermissionError(f"Security Policy Violation: Direct access to low-level Docker API '{name}' is restricted.")
         return super().__getattribute__(name)
 
     def __getattr__(self, name):
-        return getattr(self._client, name)
+        # Use object.__getattribute__ to safely access _client without triggering the security block above.
+        inner_client = object.__getattribute__(self, '_client')
+        return getattr(inner_client, name)
 
 def get_docker_client():
     """
