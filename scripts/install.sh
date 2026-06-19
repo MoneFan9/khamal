@@ -12,8 +12,8 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
-echo -e "${BLUE}🦁 Welcome to Khamal Installation${NC}"
-echo "----------------------------------"
+echo -e "${BLUE}🦁 Welcome to Khamal Installation (Zero-Config)${NC}"
+echo "------------------------------------------------"
 
 # 1. Prerequisite Checks
 echo -e "${BLUE}🔍 Checking prerequisites...${NC}"
@@ -37,6 +37,15 @@ fi
 if ! command -v nixpacks &> /dev/null; then
     echo -e "${YELLOW}⚠️  Nixpacks is not installed. It is required for building images.${NC}"
     echo "👉 Install it via: curl -sSL https://nixpacks.com/install.sh | bash"
+else
+    echo -e "${GREEN}✅ Nixpacks found.${NC}"
+fi
+
+if ! command -v ollama &> /dev/null; then
+    echo -e "${YELLOW}⚠️  Ollama is not installed. LogSage (AI Diagnostic) will not work until you install it.${NC}"
+    echo "👉 Install it via: curl -fsSL https://ollama.com/install.sh | sh"
+else
+    echo -e "${GREEN}✅ Ollama found.${NC}"
 fi
 
 # 2. Environment Setup
@@ -55,6 +64,12 @@ with open('.env', 'w') as f:
     echo -e "${GREEN}✅ .env created.${NC}"
 else
     echo "ℹ️  .env file already exists."
+fi
+
+# Update OLLAMA_KEEP_ALIVE for optimized 8GB RAM usage
+if ! grep -q "OLLAMA_KEEP_ALIVE" .env; then
+    echo "OLLAMA_KEEP_ALIVE=1m" >> .env
+    echo -e "${GREEN}✅ Configured OLLAMA_KEEP_ALIVE for memory optimization.${NC}"
 fi
 
 # 3. Security Hardening (Hidden Admin)
@@ -89,21 +104,26 @@ if update_env('SYSTEM_ADMIN_USERNAME', username):
 echo -e "${BLUE}📦 Installing dependencies...${NC}"
 if [ ! -d "venv" ]; then
     python3 -m venv venv
+    echo -e "${GREEN}✅ Virtual environment created.${NC}"
 fi
 source venv/bin/activate
-pip install --upgrade pip
-pip install -r core/requirements.txt
+echo "⬆️ Upgrading pip..."
+pip install --upgrade pip -q
+echo "📥 Installing requirements (this may take a minute)..."
+pip install -r core/requirements.txt -q
+echo -e "${GREEN}✅ Dependencies installed.${NC}"
 
 # 5. Database Migrations
 echo -e "${BLUE}🗄️  Running database migrations...${NC}"
 export PYTHONPATH=core:.
-python3 core/manage.py migrate
+python3 core/manage.py migrate -v 0
+echo -e "${GREEN}✅ Migrations completed.${NC}"
 
 # 6. Initialize System Admin
 echo -e "${BLUE}👤 Setting up system administrator...${NC}"
 # Load from .env manually
 export $(grep -v '^#' .env | xargs)
-python3 core/manage.py create_system_admin
+python3 core/manage.py create_system_admin || echo "ℹ️ Admin user might already exist."
 
 # 7. Core Services Initialization
 echo -e "${BLUE}🚀 Initializing core services...${NC}"
@@ -124,13 +144,17 @@ if ! docker ps --filter "name=docker-socket-proxy" --quiet | grep -q . ; then
         -e POST=1 \
         -e DELETE=1 \
         tecnativa/docker-socket-proxy
+    echo -e "${GREEN}✅ Docker Socket Proxy started.${NC}"
+else
+    echo -e "ℹ️  Docker Socket Proxy is already running."
 fi
 
 # Setup Traefik via management command
 echo "🌐 Setting up Traefik proxy..."
 python3 core/manage.py setup_traefik
+echo -e "${GREEN}✅ Traefik proxy configured.${NC}"
 
-echo "----------------------------------"
+echo "------------------------------------------------"
 echo -e "${GREEN}✅ Khamal installation completed successfully!${NC}"
 echo -e "${BLUE}✨ SECURITY INFORMATION (Save this!):${NC}"
 ADMIN_PATH=$(grep ADMIN_URL .env | cut -d '=' -f2)
@@ -139,8 +163,8 @@ ADMIN_PASS=$(grep SYSTEM_ADMIN_PASSWORD .env | cut -d '=' -f2)
 echo -e "  Admin URL:      ${YELLOW}http://localhost:8000/$ADMIN_PATH/${NC}"
 echo -e "  Admin User:     ${YELLOW}$ADMIN_USER${NC}"
 echo -e "  Admin Password: ${YELLOW}$ADMIN_PASS${NC}"
-echo "----------------------------------"
+echo "------------------------------------------------"
 echo -e "${BLUE}🚀 Next steps:${NC}"
 echo -e "  1. Activate the environment: ${YELLOW}source venv/bin/activate${NC}"
 echo -e "  2. Start the Khamal server:  ${YELLOW}python3 core/manage.py runserver${NC}"
-echo "----------------------------------"
+echo "------------------------------------------------"
