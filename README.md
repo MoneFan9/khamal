@@ -2,70 +2,67 @@
 
 > **"Khamal : Vos serveurs, votre intelligence, votre liberté."**
 
-Khamal est un orchestrateur intelligent de déploiement (Self-Hosted PaaS) conçu pour transformer n'importe quelle machine physique ou VPS en une infrastructure de production complète. À l'intersection de l'orchestration Docker, de la détection de build automatique et de l'intelligence artificielle locale, Khamal élimine la friction entre le code et la mise en ligne, tout en garantissant une souveraineté totale des données.
+Khamal est un orchestrateur de déploiement (Self-Hosted PaaS) **Zero-Config** conçu pour transformer n'importe quelle machine Linux en une infrastructure de production complète et sécurisée. À l'intersection de l'orchestration Docker, de la détection de build automatique (via Nixpacks) et de l'intelligence artificielle locale, Khamal élimine la complexité entre l'écriture du code et sa mise en ligne.
 
 ## 🚀 Installation "Plug & Play"
 
-Khamal est conçu pour être opérationnel immédiatement. Notre script d'installation automatise la configuration de l'environnement, la gestion des dépendances et la sécurisation du socket Docker.
+Khamal est conçu pour être opérationnel en moins de 2 minutes. Notre script d'installation automatise tout, de la gestion des dépendances à la sécurisation du système.
 
 ```bash
-# Clonez le dépôt
-git clone https://github.com/your-repo/khamal.git
-cd khamal
-
-# Lancez l'installation automatique (Zero-Config)
-bash scripts/install.sh
+# Téléchargez et lancez l'installation automatique
+curl -sSL https://raw.githubusercontent.com/your-repo/khamal/main/scripts/install.sh | bash
 ```
 
-### Ce que fait l'installateur pour vous :
-- **Vérification des prérequis** : Docker, Python 3 et Nixpacks.
-- **Isolation** : Création d'un environnement virtuel Python (venv).
-- **Sécurité** : Déploiement d'un `docker-socket-proxy` pour isoler l'accès à l'API Docker.
-- **Routage** : Initialisation de Traefik pour la gestion automatique des certificats SSL (Let's Encrypt).
-- **Prêt pour l'IA** : Configuration des points de terminaison pour Ollama.
+### Ce que fait l'installateur "Zero-Config" :
+- **Auto-détection** : Vérification de Docker, Python 3 et Nixpacks.
+- **Isolation immédiate** : Création d'un environnement virtuel Python et d'un réseau Docker isolé.
+- **Sécurisation par défaut** : Déploiement d'un `docker-socket-proxy` pour protéger l'API Docker du serveur.
+- **Routage Intelligent** : Initialisation automatique de Traefik v3 avec support SSL (Let's Encrypt) prêt à l'emploi.
+- **Optimisation IA** : Pré-configuration pour Ollama afin d'activer immédiatement LogSage.
 
-## 📂 Structure du Projet (Open-Core)
+## 📂 Architecture Open-Core
 
-Khamal suit un modèle **Open-Core** strict pour garantir une base saine et extensible :
+Khamal suit un modèle **Open-Core** strict pour garantir une base solide, transparente et extensible :
 
-- **[/core](./core) :** Le moteur open-source. Gestion des cycles de vie des conteneurs, orchestration réseau isolée, intégration Nixpacks, et moteur LogSage. **Licence Apache 2.0**.
-- **[/pro](./pro) :** Extensions professionnelles. Gestion multi-nœuds (cluster), Marque Blanche (White-labeling), et intégrations SSO. **Licence Propriétaire**.
+- **[/core](./core) (Apache 2.0) :** Le moteur open-source. Gestion des cycles de vie des conteneurs, orchestration réseau, intégration Nixpacks, et moteur de diagnostic LogSage.
+- **[/pro](./pro) (Propriétaire) :** Extensions professionnelles. Gestion multi-nœuds (Clustering), Marque Blanche (White-labeling), et intégrations SSO avancées.
 
-## 🧠 Intelligence de Diagnostic : LogSage
+## 🛡️ Security by Design (Souveraineté Totale)
 
-L'une des innovations majeures de Khamal est **LogSage**, un moteur de diagnostic basé sur l'IA locale (Llama 3.2 / Qwen 2.5 Coder via Ollama).
+La sécurité n'est pas une option dans Khamal, elle est ancrée dans son architecture :
 
-- **Réduction de Bruit** : Filtre intelligemment les logs non pertinents pour ne garder que le contexte critique.
-- **Analyse de Crash** : Identifie la cause racine d'un échec de déploiement.
-- **Correctifs Applicables** : Génère des suggestions de code directement applicables pour corriger les erreurs de configuration ou de dépendances.
+- **Hardened Docker Client** : Khamal ne parle jamais directement au socket Docker. Toutes les requêtes passent par un proxy de sécurité qui filtre les paramètres dangereux (ex: interdiction du mode `--privileged`).
+- **Isolation Réseau** : Chaque projet dispose de son propre réseau bridge isolé. Aucun conteneur ne peut communiquer avec un autre projet par défaut.
+- **Physical Ingestion Security** : Khamal supporte le déploiement via USB physique. Ce vecteur est protégé par **USBGuard** et des montages sécurisés (`noexec, nosuid, nodev`).
+- **IA Locale** : Vos logs ne quittent jamais votre serveur. Le diagnostic est effectué localement via Ollama.
 
-## 🏗️ Architecture Technique
+## 🧠 LogSage : Le Diagnostic Propulsé par l'IA
 
-La pile technologique est choisie pour sa robustesse et sa facilité de contribution :
+LogSage est le moteur de diagnostic de Khamal qui résout le problème du "bruit" dans les logs.
 
-- **Backend** : Python 3.12+ / Django 6.0.
-- **Build Engine** : Nixpacks (détection automatique de langage, pas de Dockerfile requis).
-- **Proxy/Ingress** : Traefik v3 avec support SSL automatique.
-- **Sécurité** : Isolation par réseau Docker (`bridge` par projet) et USBGuard pour les imports physiques.
+- **Stratégie MPPS** : LogSage utilise une *Multi-Phase Prioritization Strategy* pour identifier les "ancres" (erreurs critiques) et fournir le contexte exact nécessaire à l'IA, sans saturer sa fenêtre de contexte.
+- **Analyse de Cause Racine (RCA)** : Identifie instantanément pourquoi un build ou un déploiement a échoué.
+- **Fix Applicables** : Propose des correctifs de code directement applicables.
 
-## 🤝 Contribuer & Développer
+## 🤝 Contribuer au Projet
 
-Nous encourageons la communauté à enrichir le cœur de Khamal.
+Nous accueillons avec enthousiasme les contributions à la version Open-Core.
 
-### Quick Start Développeur
-1. Installez les dépendances : `pip install -r core/requirements.txt`
-2. Configurez votre `.env` à partir de `core/.env.example`.
-3. Lancez les tests pour vérifier votre environnement :
+### Guide du Développeur
+1. **Initialisation** : `pip install -r core/requirements.txt`
+2. **Configuration** : Utilisez `core/.env.example` comme base.
+3. **Tests** :
    ```bash
-   export PYTHONPATH=core:.
+   export PYTHONPATH=$(pwd)/core:$(pwd)/pro:.
+   export DJANGO_SETTINGS_MODULE=khamal.settings.development
    pytest
    ```
 
-### Règles d'Or
-- **Isolation du Core** : Le dossier `core/` ne doit **jamais** importer de modules provenant de `pro/`.
-- **Tests** : Toute nouvelle fonctionnalité dans le core doit être accompagnée de tests unitaires et d'intégration.
-- **Documentation** : Documentez le "Pourquoi" derrière vos choix techniques dans les docstrings.
+### Règles d'Or de l'Architecture
+- **Dépendance Unidirectionnelle** : Le dossier `/core` est le socle. Il ne doit **JAMAIS** importer de modules provenant de `/pro`.
+- **Zéro Régression** : Chaque pull request doit maintenir une couverture de test proche de 100% sur les composants critiques.
+- **Documentation technique** : Expliquez le "Pourquoi" dans vos docstrings pour faciliter la maintenance à long terme.
 
 ## 📄 Licence
-- `/core` est sous licence [Apache 2.0](./core/LICENSE).
-- `/pro` est sous [licence commerciale propriétaire](./pro/LICENSE).
+- Le cœur du projet (`/core`) est sous licence **Apache 2.0**.
+- Les modules professionnels (`/pro`) sont sous licence commerciale propriétaire.
