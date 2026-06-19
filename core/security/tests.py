@@ -77,7 +77,9 @@ class USBMountTests(TestCase):
     @patch("os.path.exists")
     @patch("os.makedirs")
     @patch("subprocess.run")
-    def test_mount_volume_success(self, mock_run, mock_makedirs, mock_exists, mock_usbguard, mock_active, mock_list, mock_block):
+    @patch("os.path.realpath")
+    def test_mount_volume_success(self, mock_realpath, mock_run, mock_makedirs, mock_exists, mock_usbguard, mock_active, mock_list, mock_block):
+        mock_realpath.side_effect = lambda x: x
         mock_usbguard.return_value = True
         mock_active.return_value = True
         mock_list.return_value = "1: allow id 1234:5678 serial \"\" name \"\" hash \"\" parent-hash \"\" via-port \"usb1\" with-interface { 08:06:50 } with-connect-type \"\" with-devpath \"/dev/sdb1\""
@@ -100,7 +102,9 @@ class USBMountTests(TestCase):
     @patch("security.usb_mount.USBGuardManager.is_installed")
     @patch("os.path.exists")
     @patch("subprocess.run")
-    def test_mount_volume_failure(self, mock_run, mock_exists, mock_usbguard, mock_active, mock_list, mock_block):
+    @patch("os.path.realpath")
+    def test_mount_volume_failure(self, mock_realpath, mock_run, mock_exists, mock_usbguard, mock_active, mock_list, mock_block):
+        mock_realpath.side_effect = lambda x: x
         mock_usbguard.return_value = True
         mock_active.return_value = True
         mock_list.return_value = "allow /dev/sdb1"
@@ -168,9 +172,38 @@ class USBMountTests(TestCase):
         self.assertFalse(result)
 
     @patch("os.path.commonpath")
-    def test_mount_volume_commonpath_value_error(self, mock_commonpath):
+    @patch("os.path.realpath")
+    def test_mount_volume_commonpath_value_error(self, mock_realpath, mock_commonpath):
+        mock_realpath.side_effect = lambda x: x
         # We need to let the first call to commonpath succeed (for /dev validation)
         # and make the second one fail (for /mnt/usb validation)
         mock_commonpath.side_effect = ["/dev", ValueError("Invalid paths")]
         result = USBMountManager.mount_volume("/dev/sdb1", "/mnt/usb/stick")
         self.assertFalse(result)
+
+    @patch("security.usb_mount.Path.is_block_device")
+    @patch("security.usb_mount.USBGuardManager.list_devices")
+    @patch("security.usb_mount.USBGuardManager.is_service_active")
+    @patch("security.usb_mount.USBGuardManager.is_installed")
+    @patch("os.path.realpath")
+    def test_mount_volume_not_block_device(self, mock_realpath, mock_installed, mock_active, mock_list, mock_block):
+        mock_realpath.side_effect = lambda x: x
+        mock_installed.return_value = True
+        mock_active.return_value = True
+        mock_list.return_value = "allow /dev/sdb1"
+        mock_block.return_value = False # NOT a block device
+
+        result = USBMountManager.mount_volume("/dev/sdb1", "/mnt/usb/stick")
+        self.assertFalse(result)
+
+    @patch("os.path.realpath")
+    def test_validate_paths_resolves_symlinks(self, mock_realpath):
+        # /dev/sdb1 -> /dev/sdc1
+        # /mnt/usb/stick -> /mnt/usb/real_stick
+        mock_realpath.side_effect = ["/dev/sdc1", "/mnt/usb/real_stick"]
+
+        is_valid, dev, mount = USBMountManager._validate_paths("/dev/sdb1", "/mnt/usb/stick")
+
+        self.assertTrue(is_valid)
+        self.assertEqual(dev, "/dev/sdc1")
+        self.assertEqual(mount, "/mnt/usb/real_stick")

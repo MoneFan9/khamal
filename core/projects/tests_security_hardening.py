@@ -53,8 +53,10 @@ class SecurityHardeningTests(TestCase):
     @patch("os.path.exists")
     @patch("os.makedirs")
     @patch("subprocess.run")
-    def test_usb_mount_valid(self, mock_run, mock_makedirs, mock_exists, mock_usbguard, mock_active, mock_list, mock_block):
+    @patch("os.path.realpath")
+    def test_usb_mount_valid(self, mock_realpath, mock_run, mock_makedirs, mock_exists, mock_usbguard, mock_active, mock_list, mock_block):
         """Test USBMountManager with valid parameters and verify flags."""
+        mock_realpath.side_effect = lambda x: x
         mock_usbguard.return_value = True
         mock_active.return_value = True
         mock_list.return_value = "allow /dev/sdb1"
