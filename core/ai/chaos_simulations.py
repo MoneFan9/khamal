@@ -76,3 +76,49 @@ SyntaxError: invalid syntax
             "fixed_block": "def list_items(request):",
             "rationale": "Missing colon after function definition in api/v1/endpoints.py."
         }
+
+    @staticmethod
+    def get_oom_failure():
+        return {
+            "name": "Out of Memory (OOM)",
+            "logs": """
+[2024-05-20 12:00:00] INFO: Processing large dataset...
+[2024-05-20 12:00:15] DEBUG: Memory usage: 7.2GB / 8GB
+[2024-05-20 12:00:20] CRITICAL: Memory limit exceeded.
+[2024-05-20 12:00:20] FATAL: kernel: [12345.678] Out of memory: Kill process 1234 (python3) score 950 or sacrifice child
+[2024-05-20 12:00:21] INFO: Worker killed.
+            """,
+            "project_context": {
+                "project_name": "Data-Processor",
+                "language": "Python/Pandas",
+                "environment": "Production"
+            },
+            "broken_file": "processor/worker.py",
+            "broken_content": "df = pd.read_csv('massive_data.csv')\n# Process all at once",
+            "fixed_content": "for chunk in pd.read_csv('massive_data.csv', chunksize=1000):\n    # Process chunk by chunk",
+            "search_block": "df = pd.read_csv('massive_data.csv')\n# Process all at once",
+            "fixed_block": "for chunk in pd.read_csv('massive_data.csv', chunksize=1000):\n    # Process chunk by chunk",
+            "rationale": "The application is crashing due to OOM when loading the entire CSV. Using chunking to reduce memory footprint."
+        }
+
+    @staticmethod
+    def get_permission_denied():
+        return {
+            "name": "Permission Denied",
+            "logs": """
+INFO: Initializing logger...
+ERROR: [Errno 13] Permission denied: '/var/log/app.log'
+CRITICAL: Could not open log file for writing.
+            """,
+            "project_context": {
+                "project_name": "Core-Service",
+                "language": "Python",
+                "environment": "Production"
+            },
+            "broken_file": "core/config.py",
+            "broken_content": "LOG_FILE = '/var/log/app.log'",
+            "fixed_content": "LOG_FILE = './logs/app.log'",
+            "search_block": "LOG_FILE = '/var/log/app.log'",
+            "fixed_block": "LOG_FILE = './logs/app.log'",
+            "rationale": "The application lacks permissions to write to /var/log/. Switching to a local logs directory."
+        }
