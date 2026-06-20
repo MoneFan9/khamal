@@ -1,13 +1,17 @@
 import pytest
 import docker
+import time
 from unittest.mock import patch, MagicMock
 from projects.models import Project, Deployment
 from projects.services import (
     ensure_project_network, start_container, stop_container,
     restart_container, remove_container, _get_deployment_volumes,
-    _wait_for_healthy, provision_database, get_deployment_logs
+    _wait_for_healthy, provision_database, get_deployment_logs,
+    get_routing_labels, delete_project_network
 )
 from django.contrib.auth import get_user_model
+from django.conf import settings
+from local.models import LocalSource
 
 User = get_user_model()
 
@@ -44,6 +48,18 @@ class TestServicesExtended:
         assert network_id == "existing-id"
 
     @patch("projects.services.get_docker_client")
+    def test_ensure_project_network_failure(self, mock_get_client):
+        user = User.objects.create(username="testuser_netfail_crit")
+        project = Project.objects.create(name="testproj_netfail_crit", owner=user)
+        mock_client = MagicMock()
+        mock_get_client.return_value = mock_client
+        mock_client.networks.list.return_value = []
+        mock_client.networks.create.side_effect = Exception("Docker error")
+
+        with pytest.raises(Exception):
+            ensure_project_network(project)
+
+    @patch("projects.services.get_docker_client")
     def test_container_lifecycle_exceptions(self, mock_get_client):
         user = User.objects.create(username="testuser_lifecycle")
         project = Project.objects.create(name="testproj_lifecycle", owner=user)
@@ -73,7 +89,6 @@ class TestServicesExtended:
         project = Project.objects.create(name="testproj_noid", owner=user)
         deployment = Deployment.objects.create(project=project, container_id=None)
 
-        from projects.services import delete_project_network
         project_no_net = Project.objects.create(name="nonet", owner=user, network_id=None)
 
         # Test returns when no ID is present
@@ -91,9 +106,21 @@ class TestServicesExtended:
         mock_get_client.return_value = mock_client
         mock_client.networks.get.side_effect = Exception("Delete failed")
 
-        from projects.services import delete_project_network
         delete_project_network(project)
         assert project.network_id is None
+
+    def test_get_deployment_volumes_hot_reload(self):
+        user = User.objects.create(username="testuser_hot")
+        project = Project.objects.create(name="testproj_hot", owner=user)
+        LocalSource.objects.create(
+            project=project,
+            host_path="/tmp/host",
+            container_path="/app"
+        )
+        deployment = Deployment.objects.create(project=project, hot_reload=True)
+
+        volumes = _get_deployment_volumes(deployment)
+        assert volumes == {"/tmp/host": {"bind": "/app", "mode": "rw"}}
 
     def test_get_deployment_volumes_missing_localsource(self):
         user = User.objects.create(username="testuser")
@@ -111,6 +138,18 @@ class TestServicesExtended:
         # We need to mock time.sleep to avoid waiting
         with patch("projects.services.time.sleep"):
             result = _wait_for_healthy(container, timeout=1)
+            assert result is False
+
+    @patch("projects.services.time.sleep")
+    def test_wait_for_healthy_timeout(self, mock_sleep):
+        container = MagicMock()
+        container.attrs = {"State": {"Health": {"Status": "starting"}}}
+        container.status = "running"
+
+        # Mock time to expire quickly
+        with patch("projects.services.time.monotonic") as mock_time:
+            mock_time.side_effect = [0, 100] # timeout is 60
+            result = _wait_for_healthy(container)
             assert result is False
 
     @patch("projects.services.get_docker_client")
@@ -205,9 +244,17 @@ class TestServicesExtended:
         deployment = Deployment.objects.create(project=project, container_port=80)
 
         mock_settings.KHAMAL_SSL_ENABLED = False
-        from projects.services import get_routing_labels
         labels = get_routing_labels(deployment)
         assert labels[f"traefik.http.routers.khamal-router-{deployment.id}.entrypoints"] == "web"
+
+    def test_get_routing_labels_ssl(self):
+        user = User.objects.create(username="testuser_ssl")
+        project = Project.objects.create(name="testproj_ssl", owner=user, domain="example.com")
+        deployment = Deployment.objects.create(project=project, container_port=8000)
+
+        with patch.object(settings, "KHAMAL_SSL_ENABLED", True):
+            labels = get_routing_labels(deployment)
+            assert labels[f"traefik.http.routers.khamal-router-{deployment.id}.tls"] == "true"
 
     @patch("projects.services.get_docker_client")
     def test_get_deployment_logs_not_found(self, mock_get_client):

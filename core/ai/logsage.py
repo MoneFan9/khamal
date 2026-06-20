@@ -1,4 +1,5 @@
 import re
+import itertools
 from typing import List
 
 class LogSagePreprocessor:
@@ -132,7 +133,7 @@ class LogSagePreprocessor:
     def process(self, raw_logs: str) -> List[str]:
         """
         Main algorithm: filters noise, deduplicates, and prioritizes critical errors.
-        Uses generators for memory efficiency.
+        Uses generators for memory efficiency. Enforces a safety limit of 2000 lines.
         """
         if not raw_logs:
             return []
@@ -149,15 +150,13 @@ class LogSagePreprocessor:
                     yield item
                 prev = item
 
-        deduplicated_gen = gen_deduplicate(filtered)
+        # Enforce safety limit (2000 lines max before prioritization)
+        limited_filtered = itertools.islice(filtered, 2000)
+        deduplicated_gen = gen_deduplicate(limited_filtered)
 
         # Convert to list only when necessary for prioritization or if small enough
         # We need a list for _prioritize_logs because it uses indices and multiple passes
-        deduplicated = []
-        for i, log in enumerate(deduplicated_gen):
-            deduplicated.append(log)
-            # If we are already under the limit and only have a few more, we might still want to list it
-            # But the logic below will handle it.
+        deduplicated = list(deduplicated_gen)
 
         if len(deduplicated) <= self.max_output_lines:
             return deduplicated
