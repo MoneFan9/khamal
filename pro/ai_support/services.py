@@ -24,9 +24,9 @@ class LLMService:
 
 class RouterService:
     # Thresholds for routing
-    # Adjusted threshold to 7.5GB to allow local LLM on 8GB machines with safety margin
+    # Adjusted threshold to 7.6GB to allow local LLM on 8GB machines with safety margin
     MIN_CPU_CORES = 4
-    MIN_MEMORY_BYTES = 7.5 * 1024 * 1024 * 1024
+    MIN_MEMORY_BYTES = 7.6 * 1024 * 1024 * 1024
 
     @classmethod
     def route_request(cls, server):
