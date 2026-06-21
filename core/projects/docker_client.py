@@ -17,7 +17,8 @@ class HardenedContainerCollection:
         forbidden_params = {
             'privileged', 'cap_add', 'security_opt', 'userns_mode',
             'pid_mode', 'group_add', 'oom_kill_disable', 'devices',
-            'device_cgroup_rules'
+            'device_cgroup_rules', 'network_mode', 'ipc_mode', 'uts_mode',
+            'sysctls'
         }
 
         def _recursive_check(d):
@@ -47,7 +48,9 @@ class HardenedDockerClient:
         return super().__getattribute__(name)
 
     def __getattr__(self, name):
-        return getattr(self._client, name)
+        # We must use super().__getattribute__('_client') to bypass our own security check in __getattribute__
+        internal_client = super().__getattribute__('_client')
+        return getattr(internal_client, name)
 
 def get_docker_client():
     """
