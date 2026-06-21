@@ -1,6 +1,6 @@
 from django.conf import settings
 from .docker_client import get_docker_client
-from .models import Project, Deployment
+from .models import Project, Deployment, DatabaseInstance
 from local.models import LocalSource
 import logging
 import docker
@@ -400,20 +400,35 @@ def _wait_for_healthy(container, timeout: int = 60):
         time.sleep(2)
     return False
 
-def _get_db_config(engine: str, project_id: int) -> tuple[dict, dict]:
+def _get_db_config(project: Project, engine: str) -> tuple[dict, dict]:
     """
     Returns the environment variables and volume mappings for the database engine.
+    Utilizes DatabaseInstance to persist credentials.
     """
+    db_inst, created = DatabaseInstance.objects.get_or_create(
+        project=project,
+        engine=engine,
+        defaults={
+            'db_name': 'khamal' if engine == 'postgres' else None,
+            'db_user': 'khamal' if engine == 'postgres' else None,
+            'db_password': secrets.token_urlsafe(16)
+        }
+    )
+
     environment = {}
     if engine == "postgres":
         environment = {
-            "POSTGRES_DB": "khamal",
-            "POSTGRES_USER": "khamal",
-            "POSTGRES_PASSWORD": secrets.token_urlsafe(16)
+            "POSTGRES_DB": db_inst.db_name,
+            "POSTGRES_USER": db_inst.db_user,
+            "POSTGRES_PASSWORD": db_inst.db_password
         }
+    elif engine == "redis":
+        # Redis-specific env if needed, for now just password in some configs
+        # but standard redis image doesn't use it via env by default without custom entrypoint
+        pass
 
     volumes = {
-        f"khamal-data-{engine}-{project_id}": {
+        f"khamal-data-{engine}-{project.id}": {
             "bind": "/var/lib/postgresql/data" if engine == "postgres" else "/data",
             "mode": "rw"
         }
@@ -440,7 +455,7 @@ def provision_database(project: Project, engine: str):
     except docker.errors.NotFound:
         logger.info(f"Provisioning new {engine} container: {container_name}")
 
-    environment, volumes = _get_db_config(engine, project.id)
+    environment, volumes = _get_db_config(project, engine)
 
     try:
         # SECURITY: Privileged mode and cap_add are strictly forbidden.

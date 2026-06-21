@@ -59,3 +59,33 @@ class Deployment(models.Model):
 
     def __str__(self):
         return f"{self.project.name} - {self.status} ({self.created_at})"
+
+class DatabaseInstance(models.Model):
+    """
+    Persists database credentials for a project to ensure they are stable across container recreations.
+    """
+    class Engine(models.TextChoices):
+        POSTGRES = "postgres", "PostgreSQL"
+        REDIS = "redis", "Redis"
+
+    project = models.ForeignKey(
+        Project,
+        on_delete=models.CASCADE,
+        related_name="databases"
+    )
+    engine = models.CharField(
+        max_length=20,
+        choices=Engine.choices
+    )
+    db_name = models.CharField(max_length=255, blank=True, null=True)
+    db_user = models.CharField(max_length=255, blank=True, null=True)
+    db_password = models.CharField(max_length=255)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('project', 'engine')
+
+    def __str__(self):
+        return f"{self.engine} for {self.project.name}"
