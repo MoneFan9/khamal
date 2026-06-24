@@ -103,7 +103,7 @@ class USBMountTests(TestCase):
     def test_mount_volume_failure(self, mock_run, mock_exists, mock_usbguard, mock_active, mock_list, mock_block):
         mock_usbguard.return_value = True
         mock_active.return_value = True
-        mock_list.return_value = "allow /dev/sdb1"
+        mock_list.return_value = "1: allow id 1d6b:0002 ... with-devpath \"/dev/sdb1\""
         mock_block.return_value = True
         mock_exists.return_value = True
         mock_run.side_effect = subprocess.CalledProcessError(1, "mount", stderr="Permission denied")

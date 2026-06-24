@@ -22,17 +22,17 @@ class TestLogSagePreprocessor(unittest.TestCase):
         self.assertNotIn("INFO: Healthcheck ok", processed)
 
     def test_deduplication(self):
-        logs = [
-            "ERROR: DB connection timeout",
-            "ERROR: DB connection timeout",
-            "INFO: Retrying...",
-            "ERROR: DB connection timeout",
-        ]
-        deduplicated = self.preprocessor.deduplicate(logs)
-        self.assertEqual(len(deduplicated), 3)
-        self.assertEqual(deduplicated[0], "ERROR: DB connection timeout")
-        self.assertEqual(deduplicated[1], "INFO: Retrying...")
-        self.assertEqual(deduplicated[2], "ERROR: DB connection timeout")
+        logs = """
+        ERROR: DB connection timeout
+        ERROR: DB connection timeout
+        INFO: Retrying...
+        ERROR: DB connection timeout
+        """
+        processed = self.preprocessor.process(logs)
+        self.assertEqual(len(processed), 3)
+        self.assertEqual(processed[0], "ERROR: DB connection timeout")
+        self.assertEqual(processed[1], "INFO: Retrying...")
+        self.assertEqual(processed[2], "ERROR: DB connection timeout")
 
     def test_severity_scoring(self):
         self.assertEqual(self.preprocessor.get_severity_score("CRITICAL: Out of memory"), 100)
