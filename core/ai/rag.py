@@ -110,6 +110,12 @@ Analyze the following preprocessed logs to perform a technical Root Cause Analys
             return f"... [truncated — showing last portion] ...\n{formatted_logs[-self.max_log_chars:]}"
         return formatted_logs
 
+    def get_system_prompt(self) -> str:
+        """
+        Legacy method for compatibility.
+        """
+        return self.system_prompt
+
     def build_prompt(
         self,
         logs: list[str],
