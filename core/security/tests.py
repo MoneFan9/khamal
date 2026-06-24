@@ -68,6 +68,34 @@ class USBGuardTests(TestCase):
         self.assertTrue(result)
         mock_run.assert_called_with(["sudo", "usbguard", "block-device", "1"], check=True)
 
+    @patch("subprocess.run")
+    def test_usbguard_list_devices_failure(self, mock_run):
+        mock_run.side_effect = subprocess.CalledProcessError(1, "usbguard", stderr="Error listing devices")
+        result = USBGuardManager.list_devices()
+        self.assertIsNone(result)
+
+    @patch("subprocess.run")
+    def test_usbguard_generate_policy_failure(self, mock_run):
+        mock_run.side_effect = subprocess.CalledProcessError(1, "usbguard", stderr="Error generating policy")
+        result = USBGuardManager.generate_policy()
+        self.assertIsNone(result)
+
+    @patch("subprocess.run")
+    def test_usbguard_is_installed_failure(self, mock_run):
+        mock_run.side_effect = subprocess.CalledProcessError(1, "usbguard")
+        self.assertFalse(USBGuardManager.is_installed())
+
+    @patch("subprocess.run")
+    def test_usbguard_is_service_active_failure_extra(self, mock_run):
+        mock_run.side_effect = FileNotFoundError()
+        self.assertFalse(USBGuardManager.is_service_active())
+
+    @patch("subprocess.Popen")
+    def test_usbguard_apply_policy_exception(self, mock_popen):
+        mock_popen.side_effect = Exception("OS Error")
+        result = USBGuardManager.apply_policy("allow all")
+        self.assertFalse(result)
+
 class USBMountTests(TestCase):
 
     @patch("security.usb_mount.Path.is_block_device")
@@ -172,5 +200,73 @@ class USBMountTests(TestCase):
         # We need to let the first call to commonpath succeed (for /dev validation)
         # and make the second one fail (for /mnt/usb validation)
         mock_commonpath.side_effect = ["/dev", ValueError("Invalid paths")]
+        result = USBMountManager.mount_volume("/dev/sdb1", "/mnt/usb/stick")
+        self.assertFalse(result)
+
+    @patch("security.usb_mount.USBGuardManager.list_devices")
+    @patch("security.usb_mount.USBGuardManager.is_service_active")
+    @patch("security.usb_mount.USBGuardManager.is_installed")
+    @patch("security.usb_mount.Path.is_block_device")
+    def test_mount_volume_not_authorized(self, mock_block, mock_installed, mock_active, mock_list):
+        mock_installed.return_value = True
+        mock_active.return_value = True
+        mock_block.return_value = True
+        mock_list.return_value = "1: allow id 1234:5678" # Different from /dev/sdb1
+
+        result = USBMountManager.mount_volume("/dev/sdb1", "/mnt/usb/stick")
+        self.assertFalse(result)
+
+    @patch("security.usb_mount.USBGuardManager.list_devices")
+    @patch("security.usb_mount.USBGuardManager.is_service_active")
+    @patch("security.usb_mount.USBGuardManager.is_installed")
+    @patch("security.usb_mount.Path.is_block_device")
+    def test_mount_volume_list_devices_none(self, mock_block, mock_installed, mock_active, mock_list):
+        mock_installed.return_value = True
+        mock_active.return_value = True
+        mock_block.return_value = True
+        mock_list.return_value = None
+
+        result = USBMountManager.mount_volume("/dev/sdb1", "/mnt/usb/stick")
+        self.assertFalse(result)
+
+    @patch("security.usb_mount.USBGuardManager.is_installed")
+    @patch("security.usb_mount.USBGuardManager.is_service_active")
+    def test_mount_volume_usbguard_not_active(self, mock_active, mock_installed):
+        mock_installed.return_value = True
+        mock_active.return_value = False
+        result = USBMountManager.mount_volume("/dev/sdb1", "/mnt/usb/stick")
+        self.assertFalse(result)
+
+    @patch("security.usb_mount.USBGuardManager.list_devices")
+    @patch("security.usb_mount.USBGuardManager.is_service_active")
+    @patch("security.usb_mount.USBGuardManager.is_installed")
+    @patch("security.usb_mount.Path.is_block_device")
+    @patch("os.path.exists")
+    @patch("os.makedirs")
+    def test_mount_volume_makedirs_failure_extra(self, mock_makedirs, mock_exists, mock_block, mock_installed, mock_active, mock_list):
+        mock_installed.return_value = True
+        mock_active.return_value = True
+        mock_block.return_value = True
+        mock_list.return_value = "allow with-devpath \"/dev/sdb1\""
+        mock_exists.return_value = False
+        mock_makedirs.side_effect = OSError("Permission denied")
+
+        result = USBMountManager.mount_volume("/dev/sdb1", "/mnt/usb/stick")
+        self.assertFalse(result)
+
+    @patch("security.usb_mount.USBGuardManager.list_devices")
+    @patch("security.usb_mount.USBGuardManager.is_service_active")
+    @patch("security.usb_mount.USBGuardManager.is_installed")
+    @patch("security.usb_mount.Path.is_block_device")
+    @patch("os.path.exists")
+    @patch("subprocess.run")
+    def test_mount_volume_subprocess_failure_extra(self, mock_run, mock_exists, mock_block, mock_installed, mock_active, mock_list):
+        mock_installed.return_value = True
+        mock_active.return_value = True
+        mock_block.return_value = True
+        mock_list.return_value = "allow with-devpath \"/dev/sdb1\""
+        mock_exists.return_value = True
+        mock_run.side_effect = subprocess.CalledProcessError(1, "mount", stderr="Mount failed")
+
         result = USBMountManager.mount_volume("/dev/sdb1", "/mnt/usb/stick")
         self.assertFalse(result)
