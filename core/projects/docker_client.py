@@ -1,4 +1,5 @@
 import docker
+import os
 from django.conf import settings
 
 class HardenedContainerCollection:
@@ -7,17 +8,19 @@ class HardenedContainerCollection:
 
     def run(self, *args, **kwargs):
         self._check_security_params(kwargs)
+        self._check_volumes(kwargs)
         return self._collection.run(*args, **kwargs)
 
     def create(self, *args, **kwargs):
         self._check_security_params(kwargs)
+        self._check_volumes(kwargs)
         return self._collection.create(*args, **kwargs)
 
     def _check_security_params(self, params):
         forbidden_params = {
             'privileged', 'cap_add', 'security_opt', 'userns_mode',
             'pid_mode', 'group_add', 'oom_kill_disable', 'devices',
-            'device_cgroup_rules'
+            'device_cgroup_rules', 'network_mode', 'ipc_mode', 'uts_mode', 'sysctls'
         }
 
         def _recursive_check(d):
@@ -31,8 +34,49 @@ class HardenedContainerCollection:
 
         _recursive_check(params)
 
+    def _check_volumes(self, kwargs):
+        volumes = kwargs.get('volumes')
+        mounts = kwargs.get('mounts')
+
+        restricted_paths = [
+            '/', '/etc', '/var/run/docker.sock', '/root', '/home', '/usr', '/bin', '/sbin', '/lib', '/var'
+        ]
+
+        def _is_restricted(path):
+            try:
+                # Use realpath to resolve symlinks and prevent bypasses like /var/run/../etc/shadow
+                abs_path = os.path.realpath(path)
+                for restricted in restricted_paths:
+                    restricted_abs = os.path.realpath(restricted)
+                    # Block if it's the exact path or a sub-path, OR if it's a parent path (e.g. mounting / to gain access to everything)
+                    if abs_path == restricted_abs or abs_path.startswith(restricted_abs + os.sep) or restricted_abs.startswith(abs_path + os.sep):
+                        return True
+            except Exception:
+                # In case of error, fail closed
+                return True
+            return False
+
+        if volumes:
+            if isinstance(volumes, dict):
+                for host_path in volumes.keys():
+                    if _is_restricted(host_path):
+                         raise PermissionError(f"Security Policy Violation: Mounting restricted host path '{host_path}' is forbidden.")
+            elif isinstance(volumes, list):
+                for vol in volumes:
+                    if isinstance(vol, str):
+                        host_path = vol.split(':')[0]
+                        if _is_restricted(host_path):
+                            raise PermissionError(f"Security Policy Violation: Mounting restricted host path '{host_path}' is forbidden.")
+
+        if mounts:
+            for mount in mounts:
+                # Support both docker.types.Mount and plain dicts
+                source = getattr(mount, 'source', None) or (mount.get('source') if isinstance(mount, dict) else None)
+                if source and _is_restricted(source):
+                    raise PermissionError(f"Security Policy Violation: Mounting restricted host path '{source}' is forbidden.")
+
     def __getattribute__(self, name):
-        if name in ['_collection', 'run', 'create', '_check_security_params']:
+        if name in ['_collection', 'run', 'create', '_check_security_params', '_check_volumes']:
             return super().__getattribute__(name)
         return getattr(self._collection, name)
 
@@ -47,7 +91,9 @@ class HardenedDockerClient:
         return super().__getattribute__(name)
 
     def __getattr__(self, name):
-        return getattr(self._client, name)
+        # Use super().__getattribute__ to bypass the security check on '_client'
+        client = super().__getattribute__('_client')
+        return getattr(client, name)
 
 def get_docker_client():
     """

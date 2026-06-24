@@ -21,18 +21,22 @@ DATABASE_IMAGES = {
 def _get_traefik_config() -> tuple[list[str], dict[str, dict]]:
     """
     Returns the Traefik command-line arguments and volume mappings.
+
+    Architectural Security Note:
+    Traefik connects to the Docker API via 'docker-socket-proxy' over TCP.
+    This prevents Traefik from having direct access to /var/run/docker.sock.
     """
     command = [
         "--providers.docker=true",
         "--providers.docker.exposedbydefault=false",
         f"--providers.docker.network={PROXY_NETWORK_NAME}",
+        "--providers.docker.endpoint=tcp://docker-socket-proxy:2375",
         "--entrypoints.web.address=:80",
         "--entrypoints.websecure.address=:443",
     ]
 
-    volumes = {
-        '/var/run/docker.sock': {'bind': '/var/run/docker.sock', 'mode': 'ro'}
-    }
+    # No more direct docker.sock mount
+    volumes = {}
 
     if settings.KHAMAL_SSL_ENABLED:
         command.extend([
@@ -85,36 +89,6 @@ def ensure_global_proxy():
             command=command,
             labels={"khamal.managed": "true"}
         )
-
-def _get_traefik_config() -> tuple[list[str], dict]:
-    """
-    Returns the command and volumes for the global Traefik container.
-    """
-    command = [
-        "--providers.docker=true",
-        "--providers.docker.exposedbydefault=false",
-        f"--providers.docker.network={PROXY_NETWORK_NAME}",
-        "--entrypoints.web.address=:80",
-        "--entrypoints.websecure.address=:443",
-    ]
-
-    volumes = {
-        '/var/run/docker.sock': {'bind': '/var/run/docker.sock', 'mode': 'ro'}
-    }
-
-    if settings.KHAMAL_SSL_ENABLED:
-        command.extend([
-            "--certificatesresolvers.le.acme.email=" + settings.KHAMAL_ACME_EMAIL,
-            "--certificatesresolvers.le.acme.storage=" + settings.KHAMAL_ACME_STORAGE,
-            "--certificatesresolvers.le.acme.tlschallenge=true",
-            "--certificatesresolvers.le.acme.caserver=" + settings.KHAMAL_ACME_CA_SERVER,
-            "--entrypoints.web.http.redirections.entryPoint.to=websecure",
-            "--entrypoints.web.http.redirections.entryPoint.scheme=https",
-        ])
-        # Persist certificates
-        volumes['khamal-letsencrypt'] = {'bind': '/letsencrypt', 'mode': 'rw'}
-
-    return command, volumes
 
 def ensure_project_network(project: Project) -> str:
     """
@@ -262,10 +236,13 @@ def remove_container(deployment: Deployment, force=False):
         deployment.container_id = None
         deployment.status = Deployment.Status.REMOVED
         deployment.save(update_fields=['container_id', 'status'])
+    except docker.errors.NotFound:
+        logger.warning(f"Container {deployment.container_id} not found during removal.")
+        deployment.container_id = None
+        deployment.status = Deployment.Status.REMOVED
+        deployment.save(update_fields=['container_id', 'status'])
     except Exception as e:
         logger.error(f"Failed to remove container {deployment.container_id}: {e}")
-        # Even if removal fails from Docker's side (e.g. not found),
-        # we might want to clear it from our DB if it's a "force" or cleanup operation.
         raise
 
 def get_routing_labels(deployment: Deployment) -> dict:
