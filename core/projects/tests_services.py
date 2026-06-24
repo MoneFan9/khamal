@@ -230,6 +230,26 @@ class TraefikServiceTest(TestCase):
         self.assertTrue(kwargs['detach'])
         self.assertIn("--providers.docker=true", kwargs['command'])
 
+    def test_traefik_config_ssl_enabled(self):
+        from django.conf import settings
+        with self.settings(
+            KHAMAL_SSL_ENABLED=True,
+            KHAMAL_ACME_EMAIL="test@example.com",
+            KHAMAL_ACME_STORAGE="/letsencrypt/acme.json",
+            KHAMAL_ACME_CA_SERVER="https://acme-v02.api.letsencrypt.org/directory"
+        ):
+            from projects.services import _get_traefik_config
+            command, volumes = _get_traefik_config()
+            self.assertIn("--certificatesresolvers.le.acme.email=test@example.com", command)
+            self.assertIn("khamal-letsencrypt", volumes)
+
+    def test_traefik_config_ssl_disabled(self):
+        with self.settings(KHAMAL_SSL_ENABLED=False):
+            from projects.services import _get_traefik_config
+            command, volumes = _get_traefik_config()
+            self.assertFalse(any("certificatesresolvers" in arg for arg in command))
+            self.assertNotIn("khamal-letsencrypt", volumes)
+
 class RoutingLabelsTest(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(username="testuser_routing", password="password")
