@@ -12,6 +12,7 @@ class USBGuardManager:
     def is_installed():
         """Checks if usbguard is available in the system."""
         try:
+            # Check for usbguard in common paths if not in PATH
             subprocess.run(["usbguard", "--version"], capture_output=True, check=True)
             return True
         except (subprocess.CalledProcessError, FileNotFoundError):
