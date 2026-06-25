@@ -7,20 +7,23 @@ import subprocess
 class SecurityHardeningTests(TestCase):
 
     @patch("security.usb_mount.Path.is_block_device")
+    @patch("security.usb_mount.USBGuardManager.list_devices")
     @patch("security.usb_mount.USBGuardManager.is_service_active")
     @patch("security.usb_mount.USBGuardManager.is_installed")
-    def test_mount_fails_if_not_block_device(self, mock_installed, mock_active, mock_block):
+    def test_mount_fails_if_not_block_device(self, mock_installed, mock_active, mock_list, mock_block):
         mock_installed.return_value = True
         mock_active.return_value = True
+        mock_list.return_value = "allow /dev/sdb1"
         mock_block.return_value = False
 
         result = USBMountManager.mount_volume("/dev/sdb1", "/mnt/usb/stick")
         self.assertFalse(result)
 
     @patch("security.usb_mount.Path.is_block_device")
+    @patch("security.usb_mount.USBGuardManager.list_devices")
     @patch("security.usb_mount.USBGuardManager.is_service_active")
     @patch("security.usb_mount.USBGuardManager.is_installed")
-    def test_mount_fails_if_service_inactive(self, mock_installed, mock_active, mock_block):
+    def test_mount_fails_if_service_inactive(self, mock_installed, mock_active, mock_list, mock_block):
         mock_installed.return_value = True
         mock_active.return_value = False
         mock_block.return_value = True
