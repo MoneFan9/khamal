@@ -19,24 +19,31 @@ class USBMountManager:
     def _validate_paths(device_path, mount_point) -> tuple[bool, str, str]:
         """
         Internal helper to validate and normalize device and mount paths.
+        Uses realpath to resolve symlinks and enforces block device checks.
         """
         try:
-            # 1. Basic normalization
-            device_path = os.path.normpath(device_path)
+            # 1. Resolve symlinks and normalize paths
+            device_path = os.path.realpath(device_path)
             if not os.path.isabs(mount_point):
                 logger.error(f"Mount point must be absolute: {mount_point}")
                 return False, device_path, mount_point
 
-            normalized_mount = os.path.normpath(mount_point)
+            normalized_mount = os.path.realpath(mount_point)
         except Exception as e:
             logger.error(f"Path normalization error: {e}")
             return False, device_path, mount_point
 
+        # 2. Block Device Validation
+        if not Path(device_path).is_block_device():
+            logger.error(f"Security Violation: {device_path} is not a block device.")
+            return False, device_path, normalized_mount
+
+        # 3. Path Restriction Enforcement
         if os.path.commonpath(["/dev", device_path]) != "/dev":
             logger.error(f"Invalid device path (must be in /dev): {device_path}")
             return False, device_path, normalized_mount
 
-        allowed_mount_base = os.path.normpath("/mnt/usb")
+        allowed_mount_base = os.path.realpath("/mnt/usb")
         try:
             if os.path.commonpath([allowed_mount_base, normalized_mount]) != allowed_mount_base:
                 logger.error(f"Invalid mount point: {normalized_mount}. Must be within {allowed_mount_base}")
@@ -65,7 +72,7 @@ class USBMountManager:
         """
         # --- Security Hardening Protocol ---
         # 1. Path Normalization & Validation
-        is_valid, device_path, mount_point = USBMountManager._validate_paths(device_path, mount_point)
+        is_valid, normalized_device, normalized_mount = USBMountManager._validate_paths(device_path, mount_point)
         if not is_valid:
             return False
 
@@ -86,26 +93,26 @@ class USBMountManager:
              return False
 
         # Attempt to find an 'allow' rule for the device path or its parent
-        # (e.g., if device_path is /dev/sdb1, we also check for /dev/sdb)
-        parent_device = device_path.rstrip('0123456789')
+        # (e.g., if normalized_device is /dev/sdb1, we also check for /dev/sdb)
+        parent_device = normalized_device.rstrip('0123456789')
 
         authorized = False
         # Use regex with word boundaries to avoid partial matches (e.g., /dev/sdb matching /dev/sdb1)
         # and ensure 'allow' is present in the line.
         # We use a negative lookahead to ensure the path is not just a prefix (e.g. /dev/sdb vs /dev/sdb1)
-        path_pattern = re.compile(rf"\ballow\b.*({re.escape(device_path)}|{re.escape(parent_device)})(?![\w/])")
+        path_pattern = re.compile(rf"\ballow\b.*({re.escape(normalized_device)}|{re.escape(parent_device)})(?![\w/])")
 
-        logger.debug(f"Checking USBGuard authorization for {device_path} (parent: {parent_device})")
+        logger.debug(f"Checking USBGuard authorization for {normalized_device} (parent: {parent_device})")
         for line in devices.splitlines():
             if path_pattern.search(line):
                 authorized = True
                 break
 
         if not authorized:
-             logger.error(f"Device {device_path} is not authorized by USBGuard.")
+             logger.error(f"Device {normalized_device} is not authorized by USBGuard.")
              return False
 
-        if not os.path.exists(mount_point):
+        if not os.path.exists(normalized_mount):
             try:
                 os.makedirs(normalized_mount, exist_ok=True)
             except OSError as e:
@@ -118,12 +125,12 @@ class USBMountManager:
         mount_options = "noexec,nosuid,nodev"
 
         try:
-            command = ["sudo", "mount", "-o", mount_options, device_path, normalized_mount]
+            command = ["sudo", "mount", "-o", mount_options, normalized_device, normalized_mount]
             subprocess.run(command, check=True, capture_output=True, text=True)
-            logger.info(f"Successfully mounted {device_path} to {normalized_mount} with security options.")
+            logger.info(f"Successfully mounted {normalized_device} to {normalized_mount} with security options.")
             return True
         except subprocess.CalledProcessError as e:
-            logger.error(f"Failed to mount {device_path} to {normalized_mount}: {e.stderr}")
+            logger.error(f"Failed to mount {normalized_device} to {normalized_mount}: {e.stderr}")
             return False
 
     @staticmethod
