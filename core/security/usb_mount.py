@@ -19,6 +19,11 @@ class USBMountManager:
     def _validate_paths(device_path, mount_point) -> tuple[bool, str, str]:
         """
         Internal helper to validate and normalize device and mount paths.
+
+        Security Logic:
+        1. Normalizes paths to prevent directory traversal attacks.
+        2. Restricts device paths to /dev.
+        3. Restricts mount points to /mnt/usb/ to prevent overwriting system directories.
         """
         try:
             # 1. Basic normalization
@@ -69,7 +74,13 @@ class USBMountManager:
         if not is_valid:
             return False
 
-        # 4. Integrate with USBGuard
+        # 2. Block Device Verification
+        # Ensure it's a block device to avoid mounting regular files or symbolic links to system files.
+        if not Path(device_path).is_block_device():
+            logger.error(f"Device {device_path} is not a valid block device.")
+            return False
+
+        # 3. Integrate with USBGuard
         if not USBGuardManager.is_installed():
             logger.error("USBGuard is not installed. Refusing to mount for security reasons.")
             return False
@@ -78,7 +89,7 @@ class USBMountManager:
             logger.error("USBGuard service is not active. Refusing to mount for security reasons.")
             return False
 
-        # 6. Verify device authorization in USBGuard
+        # 4. Verify device authorization in USBGuard
         # We ensure that the device (or its parent block device) is explicitly allowed by USBGuard.
         devices = USBGuardManager.list_devices()
         if devices is None:
@@ -86,14 +97,12 @@ class USBMountManager:
              return False
 
         # Attempt to find an 'allow' rule for the device path or its parent
-        # (e.g., if device_path is /dev/sdb1, we also check for /dev/sdb)
         parent_device = device_path.rstrip('0123456789')
 
         authorized = False
-        # Use regex with word boundaries to avoid partial matches (e.g., /dev/sdb matching /dev/sdb1)
-        # and ensure 'allow' is present in the line.
-        # We use a negative lookahead to ensure the path is not just a prefix (e.g. /dev/sdb vs /dev/sdb1)
-        path_pattern = re.compile(rf"\ballow\b.*({re.escape(device_path)}|{re.escape(parent_device)})(?![\w/])")
+        # Use regex with word boundaries to avoid partial matches
+        # The pattern ensures the device path is authorized by a specific 'allow' rule in USBGuard.
+        path_pattern = re.compile(rf"\ballow\b.*with-devpath \"?({re.escape(device_path)}|{re.escape(parent_device)})\"?\b")
 
         logger.debug(f"Checking USBGuard authorization for {device_path} (parent: {parent_device})")
         for line in devices.splitlines():
@@ -107,23 +116,25 @@ class USBMountManager:
 
         if not os.path.exists(mount_point):
             try:
-                os.makedirs(normalized_mount, exist_ok=True)
+                os.makedirs(mount_point, exist_ok=True)
             except OSError as e:
-                logger.error(f"Failed to create mount point {normalized_mount}: {e}")
+                logger.error(f"Failed to create mount point {mount_point}: {e}")
                 return False
 
+        # SECURITY MOUNT OPTIONS:
         # -o noexec: Blocks execution of binaries (essential against malware).
         # -o nosuid: Prevents privilege escalation via setuid/setgid bits.
         # -o nodev: Disables device files interpretation.
         mount_options = "noexec,nosuid,nodev"
 
         try:
-            command = ["sudo", "mount", "-o", mount_options, device_path, normalized_mount]
+            # We use sudo for mounting, assuming the system is configured to allow this for the khamal user via sudoers.
+            command = ["sudo", "mount", "-o", mount_options, device_path, mount_point]
             subprocess.run(command, check=True, capture_output=True, text=True)
-            logger.info(f"Successfully mounted {device_path} to {normalized_mount} with security options.")
+            logger.info(f"Successfully mounted {device_path} to {mount_point} with security options.")
             return True
         except subprocess.CalledProcessError as e:
-            logger.error(f"Failed to mount {device_path} to {normalized_mount}: {e.stderr}")
+            logger.error(f"Failed to mount {device_path} to {mount_point}: {e.stderr}")
             return False
 
     @staticmethod
