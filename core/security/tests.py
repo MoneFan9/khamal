@@ -28,10 +28,21 @@ class USBGuardTests(TestCase):
         self.assertFalse(USBGuardManager.is_service_active())
 
     @patch("subprocess.run")
+    def test_is_service_active_exception(self, mock_run):
+        mock_run.side_effect = subprocess.CalledProcessError(1, "systemctl")
+        self.assertFalse(USBGuardManager.is_service_active())
+
+    @patch("subprocess.run")
     def test_generate_policy_success(self, mock_run):
         mock_run.return_value = MagicMock(stdout="allow id 1234:5678", returncode=0)
         policy = USBGuardManager.generate_policy()
         self.assertEqual(policy, "allow id 1234:5678")
+
+    @patch("subprocess.run")
+    def test_generate_policy_failure(self, mock_run):
+        mock_run.side_effect = subprocess.CalledProcessError(1, "usbguard", stderr="Error")
+        policy = USBGuardManager.generate_policy()
+        self.assertIsNone(policy)
 
     @patch("subprocess.Popen")
     @patch("subprocess.run")
@@ -48,25 +59,66 @@ class USBGuardTests(TestCase):
         mock_popen.assert_called_once()
         mock_run.assert_called_with(["sudo", "systemctl", "restart", "usbguard"], check=True)
 
+    @patch("subprocess.Popen")
+    def test_apply_policy_tee_failure(self, mock_popen):
+        mock_process = MagicMock()
+        mock_process.returncode = 1
+        mock_process.communicate.return_value = (None, None)
+        mock_popen.return_value = mock_process
+
+        result = USBGuardManager.apply_policy("allow all")
+        self.assertFalse(result)
+
+    @patch("subprocess.Popen")
     @patch("subprocess.run")
-    def test_list_devices(self, mock_run):
+    def test_apply_policy_restart_failure(self, mock_run, mock_popen):
+        mock_process = MagicMock()
+        mock_process.returncode = 0
+        mock_process.communicate.return_value = (None, None)
+        mock_popen.return_value = mock_process
+
+        mock_run.side_effect = subprocess.CalledProcessError(1, "systemctl")
+
+        result = USBGuardManager.apply_policy("allow all")
+        self.assertFalse(result)
+
+    @patch("subprocess.run")
+    def test_list_devices_success(self, mock_run):
         mock_run.return_value = MagicMock(stdout="1: allow id 1d6b:0002", returncode=0)
         devices = USBGuardManager.list_devices()
         self.assertEqual(devices, "1: allow id 1d6b:0002")
 
     @patch("subprocess.run")
-    def test_allow_device(self, mock_run):
+    def test_list_devices_failure(self, mock_run):
+        mock_run.side_effect = subprocess.CalledProcessError(1, "usbguard", stderr="Error")
+        devices = USBGuardManager.list_devices()
+        self.assertIsNone(devices)
+
+    @patch("subprocess.run")
+    def test_allow_device_success(self, mock_run):
         mock_run.return_value = MagicMock(returncode=0)
         result = USBGuardManager.allow_device(1)
         self.assertTrue(result)
         mock_run.assert_called_with(["sudo", "usbguard", "allow-device", "1"], check=True)
 
     @patch("subprocess.run")
-    def test_block_device(self, mock_run):
+    def test_allow_device_failure(self, mock_run):
+        mock_run.side_effect = subprocess.CalledProcessError(1, "usbguard")
+        result = USBGuardManager.allow_device(1)
+        self.assertFalse(result)
+
+    @patch("subprocess.run")
+    def test_block_device_success(self, mock_run):
         mock_run.return_value = MagicMock(returncode=0)
         result = USBGuardManager.block_device(1)
         self.assertTrue(result)
         mock_run.assert_called_with(["sudo", "usbguard", "block-device", "1"], check=True)
+
+    @patch("subprocess.run")
+    def test_block_device_failure(self, mock_run):
+        mock_run.side_effect = subprocess.CalledProcessError(1, "usbguard")
+        result = USBGuardManager.block_device(1)
+        self.assertFalse(result)
 
 class USBMountTests(TestCase):
 
@@ -148,6 +200,24 @@ class USBMountTests(TestCase):
     @patch("security.usb_mount.USBGuardManager.is_installed")
     def test_mount_volume_usbguard_not_installed(self, mock_installed):
         mock_installed.return_value = False
+        self.assertFalse(USBMountManager.mount_volume("/dev/sdb1", "/mnt/usb/stick"))
+
+    @patch("security.usb_mount.USBGuardManager.is_installed")
+    @patch("security.usb_mount.USBGuardManager.is_service_active")
+    def test_mount_volume_usbguard_service_inactive(self, mock_active, mock_installed):
+        mock_installed.return_value = True
+        mock_active.return_value = False
+        self.assertFalse(USBMountManager.mount_volume("/dev/sdb1", "/mnt/usb/stick"))
+
+    @patch("security.usb_mount.USBGuardManager.is_installed")
+    @patch("security.usb_mount.USBGuardManager.is_service_active")
+    @patch("security.usb_mount.USBGuardManager.list_devices")
+    @patch("security.usb_mount.Path.is_block_device")
+    def test_mount_volume_list_devices_failure(self, mock_block, mock_list, mock_active, mock_installed):
+        mock_installed.return_value = True
+        mock_active.return_value = True
+        mock_block.return_value = True
+        mock_list.return_value = None
         self.assertFalse(USBMountManager.mount_volume("/dev/sdb1", "/mnt/usb/stick"))
 
     @patch("security.usb_mount.USBGuardManager.is_installed")

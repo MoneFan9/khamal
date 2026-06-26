@@ -1,4 +1,4 @@
-from django.test import TestCase
+from django.test import TestCase, override_settings
 import docker
 from unittest.mock import patch, MagicMock
 from .models import Project, Deployment
@@ -204,6 +204,32 @@ class ContainerServiceTest(TestCase):
         self.assertIsNone(self.deployment.container_id)
 
 class TraefikServiceTest(TestCase):
+    @override_settings(KHAMAL_SSL_ENABLED=False)
+    def test_get_traefik_config_no_ssl(self):
+        from projects.services import _get_traefik_config, PROXY_NETWORK_NAME
+        command, volumes = _get_traefik_config()
+
+        self.assertIn(f"--providers.docker.network={PROXY_NETWORK_NAME}", command)
+        self.assertIn('--entrypoints.web.address=:80', command)
+        self.assertIn('/var/run/docker.sock', volumes)
+        self.assertNotIn('khamal-letsencrypt', volumes)
+        self.assertFalse(any(arg.startswith("--certificatesresolvers") for arg in command))
+
+    @override_settings(
+        KHAMAL_SSL_ENABLED=True,
+        KHAMAL_ACME_EMAIL="test@example.com",
+        KHAMAL_ACME_STORAGE="/letsencrypt/acme.json",
+        KHAMAL_ACME_CA_SERVER="https://acme-v02.api.letsencrypt.org/directory"
+    )
+    def test_get_traefik_config_with_ssl(self):
+        from projects.services import _get_traefik_config
+        command, volumes = _get_traefik_config()
+
+        self.assertIn("--certificatesresolvers.le.acme.email=test@example.com", command)
+        self.assertIn("--certificatesresolvers.le.acme.storage=/letsencrypt/acme.json", command)
+        self.assertIn("khamal-letsencrypt", volumes)
+        self.assertIn("--entrypoints.web.http.redirections.entryPoint.to=websecure", command)
+
     @patch('projects.services.get_docker_client')
     def test_ensure_global_proxy_creates_everything(self, mock_get_client):
         mock_client = MagicMock()
