@@ -5,13 +5,16 @@ class LogSagePreprocessor:
     """
     LogSage Preprocessor: The core intelligence for local crash analysis.
 
-    This preprocessor solves the "context window" problem for LLMs. Instead of sending
-    thousands of lines of logs to the local model (which is slow and memory-intensive),
+    This preprocessor solves the "context window" problem for LLMs on resource-constrained systems (8GB RAM).
+    Instead of sending thousands of lines of logs to the local model (which is slow and memory-intensive),
     LogSage identifies "anchors" (critical errors), includes their immediate context,
     and fills the remaining quota with recent relevant logs.
+
+    MPPS (Multi-Phase Prioritization Strategy) ensures that the most semantically dense
+    information is preserved for the AI to perform accurate diagnostics.
     """
 
-    # Common noise patterns in logs
+    # Common noise patterns in logs to be filtered out to save context space.
     NOISE_PATTERNS = [
         re.compile(r"heartbeat", re.I),
         re.compile(r"health\s?check", re.I),
@@ -25,7 +28,7 @@ class LogSagePreprocessor:
         re.compile(r"unimportant", re.I),
     ]
 
-    # Severity levels and their weights
+    # Severity levels and their weights for priority calculation.
     SEVERITY_LEVELS = {
         "CRITICAL": 100,
         "PANIC": 100,
@@ -132,16 +135,16 @@ class LogSagePreprocessor:
     def process(self, raw_logs: str) -> List[str]:
         """
         Main algorithm: filters noise, deduplicates, and prioritizes critical errors.
-        Uses generators for memory efficiency.
+        Uses generators for memory efficiency to prevent OOM on massive log files.
         """
         if not raw_logs:
             return []
 
-        # Use generator expressions to reduce memory overhead
+        # Use generator expressions to reduce memory overhead during initial filtering.
         lines = (line.strip() for line in raw_logs.splitlines() if line.strip())
         filtered = (line for line in lines if not self.is_noise(line))
 
-        # Deduplicate using a generator-friendly approach
+        # Deduplicate using a generator-friendly approach to keep memory usage low.
         def gen_deduplicate(iterable):
             prev = None
             for item in iterable:
@@ -151,13 +154,13 @@ class LogSagePreprocessor:
 
         deduplicated_gen = gen_deduplicate(filtered)
 
-        # Convert to list only when necessary for prioritization or if small enough
-        # We need a list for _prioritize_logs because it uses indices and multiple passes
+        # We collect into a list here as MPPS requires random access and multiple passes.
+        # Safety: In a production environment, we should cap the number of lines processed here.
         deduplicated = []
         for i, log in enumerate(deduplicated_gen):
             deduplicated.append(log)
-            # If we are already under the limit and only have a few more, we might still want to list it
-            # But the logic below will handle it.
+            if i > 2000: # Safety cap to prevent OOM
+                break
 
         if len(deduplicated) <= self.max_output_lines:
             return deduplicated

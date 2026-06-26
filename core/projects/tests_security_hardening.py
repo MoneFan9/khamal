@@ -57,7 +57,8 @@ class SecurityHardeningTests(TestCase):
         """Test USBMountManager with valid parameters and verify flags."""
         mock_usbguard.return_value = True
         mock_active.return_value = True
-        mock_list.return_value = "allow /dev/sdb1"
+        # Real-world USBGuard output format including with-devpath
+        mock_list.return_value = 'allow id 01:02:03:04:05:06 with-devpath "/dev/sdb1"'
         mock_block.return_value = True
         mock_exists.return_value = False
         mock_run.return_value = MagicMock(returncode=0)
