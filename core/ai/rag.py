@@ -1,6 +1,6 @@
 import logging
 from dataclasses import dataclass
-from typing import Optional, List, Dict, Any
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -128,6 +128,12 @@ Analyze the following preprocessed logs to perform a technical Root Cause Analys
             logs=formatted_logs
         )
         return RCAPrompt(system=self.system_prompt, user=user_content)
+
+    def get_system_prompt(self) -> str:
+        """
+        Returns the system prompt being used.
+        """
+        return self.system_prompt
 
     def __repr__(self) -> str:
         return (
