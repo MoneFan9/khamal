@@ -1,4 +1,6 @@
 import re
+import io
+import itertools
 from typing import List
 
 class LogSagePreprocessor:
@@ -129,35 +131,36 @@ class LogSagePreprocessor:
         # Re-sort chronologically
         return [logs[i] for i in sorted(list(selected_indices))]
 
+    def _gen_deduplicate(self, iterable):
+        """
+        Deduplicates consecutive lines using a generator to save memory.
+        """
+        prev = None
+        for item in iterable:
+            if item != prev:
+                yield item
+            prev = item
+
     def process(self, raw_logs: str) -> List[str]:
         """
         Main algorithm: filters noise, deduplicates, and prioritizes critical errors.
-        Uses generators for memory efficiency.
+        Optimized for memory by using io.StringIO and a safety cap of 2000 lines.
         """
         if not raw_logs:
             return []
 
-        # Use generator expressions to reduce memory overhead
-        lines = (line.strip() for line in raw_logs.splitlines() if line.strip())
+        # Use StringIO for memory-efficient log line iteration
+        log_stream = io.StringIO(raw_logs)
+
+        # Use generator expressions and islice to enforce a safety cap of 2000 lines
+        # This prevents OOM on massive log files.
+        lines = (line.strip() for line in itertools.islice(log_stream, 2000) if line.strip())
         filtered = (line for line in lines if not self.is_noise(line))
 
-        # Deduplicate using a generator-friendly approach
-        def gen_deduplicate(iterable):
-            prev = None
-            for item in iterable:
-                if item != prev:
-                    yield item
-                prev = item
+        deduplicated_gen = self._gen_deduplicate(filtered)
 
-        deduplicated_gen = gen_deduplicate(filtered)
-
-        # Convert to list only when necessary for prioritization or if small enough
-        # We need a list for _prioritize_logs because it uses indices and multiple passes
-        deduplicated = []
-        for i, log in enumerate(deduplicated_gen):
-            deduplicated.append(log)
-            # If we are already under the limit and only have a few more, we might still want to list it
-            # But the logic below will handle it.
+        # Convert to list for prioritization (requires multiple passes)
+        deduplicated = list(deduplicated_gen)
 
         if len(deduplicated) <= self.max_output_lines:
             return deduplicated
