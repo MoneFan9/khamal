@@ -76,3 +76,50 @@ SyntaxError: invalid syntax
             "fixed_block": "def list_items(request):",
             "rationale": "Missing colon after function definition in api/v1/endpoints.py."
         }
+
+    @staticmethod
+    def get_oom_error():
+        return {
+            "name": "Out of Memory (OOM)",
+            "logs": """
+[2024-05-20 12:00:00] INFO: Initializing worker...
+[2024-05-20 12:00:05] DEBUG: Allocating buffer for batch processing
+[2024-05-20 12:00:06] CRITICAL: MemoryError: Unable to allocate 8.0 GiB for array with shape (1024, 1024, 1024) and data type float64
+[2024-05-20 12:00:06] ERROR: Process 1234 terminated by signal 9 (SIGKILL)
+            """,
+            "project_context": {
+                "project_name": "Data-Processor",
+                "language": "Python/Pandas",
+                "environment": "Production"
+            },
+            "broken_file": "processor/config.py",
+            "broken_content": "BATCH_SIZE = 1000000\nCHUNK_SIZE = '8GB'",
+            "fixed_content": "BATCH_SIZE = 10000\nCHUNK_SIZE = '512MB'",
+            "search_block": "BATCH_SIZE = 1000000\nCHUNK_SIZE = '8GB'",
+            "fixed_block": "BATCH_SIZE = 10000\nCHUNK_SIZE = '512MB'",
+            "rationale": "The batch and chunk sizes are too large for the available system memory, leading to an OOM crash. Reducing them to safer values."
+        }
+
+    @staticmethod
+    def get_permission_error():
+        return {
+            "name": "Permission Denied",
+            "logs": """
+2024-05-20 14:00:00 - ERROR - Failed to start logger
+Traceback (most recent call last):
+  File "main.py", line 45, in <module>
+    with open('/var/log/app.log', 'a') as f:
+PermissionError: [Errno 13] Permission denied: '/var/log/app.log'
+            """,
+            "project_context": {
+                "project_name": "Sys-Logger",
+                "language": "Python",
+                "environment": "Staging"
+            },
+            "broken_file": "main.py",
+            "broken_content": "LOG_FILE = '/var/log/app.log'",
+            "fixed_content": "LOG_FILE = './logs/app.log'",
+            "search_block": "LOG_FILE = '/var/log/app.log'",
+            "fixed_block": "LOG_FILE = './logs/app.log'",
+            "rationale": "The application is trying to write to a system-protected directory. Redirecting logs to a local subdirectory where the application has write permissions."
+        }
