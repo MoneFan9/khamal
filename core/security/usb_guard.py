@@ -47,7 +47,7 @@ class USBGuardManager:
                 subprocess.run(["sudo", "systemctl", "restart", "usbguard"], check=True)
                 return True
             return False
-        except subprocess.CalledProcessError as e:
+        except Exception as e:
             logger.error(f"Failed to apply USBGuard policy: {e}")
             return False
 
