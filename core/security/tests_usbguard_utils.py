@@ -79,3 +79,13 @@ class USBGuardManagerTests(SimpleTestCase):
     def test_block_device_failure(self, mock_run):
         mock_run.side_effect = subprocess.CalledProcessError(1, "usbguard")
         self.assertFalse(USBGuardManager.block_device("1"))
+
+    @patch("subprocess.run")
+    def test_is_service_active_filenotfound(self, mock_run):
+        mock_run.side_effect = FileNotFoundError
+        self.assertFalse(USBGuardManager.is_service_active())
+
+    @patch("subprocess.Popen")
+    def test_apply_policy_exception(self, mock_popen):
+        mock_popen.side_effect = Exception("System error")
+        self.assertFalse(USBGuardManager.apply_policy("policy"))
