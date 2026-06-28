@@ -13,9 +13,40 @@
 {% block content %}
 <div class="px-4 py-8 sm:px-0">
     {% if projects %}
+        <!-- Stats Grid -->
+        <div class="grid grid-cols-1 gap-6 mb-12 sm:grid-cols-3">
+            <div class="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center space-x-4">
+                <div class="bg-indigo-100 p-3 rounded-2xl">
+                    <i class="fas fa-layer-group text-indigo-600 text-xl"></i>
+                </div>
+                <div>
+                    <p class="text-sm font-medium text-slate-500">Total Projets</p>
+                    <p class="text-2xl font-black text-slate-900">{{ stats.total }}</p>
+                </div>
+            </div>
+            <div class="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center space-x-4">
+                <div class="bg-emerald-100 p-3 rounded-2xl">
+                    <i class="fas fa-check-circle text-emerald-600 text-xl"></i>
+                </div>
+                <div>
+                    <p class="text-sm font-medium text-slate-500">En cours</p>
+                    <p class="text-2xl font-black text-slate-900">{{ stats.running }}</p>
+                </div>
+            </div>
+            <div class="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center space-x-4">
+                <div class="bg-rose-100 p-3 rounded-2xl">
+                    <i class="fas fa-exclamation-triangle text-rose-600 text-xl"></i>
+                </div>
+                <div>
+                    <p class="text-sm font-medium text-slate-500">Échecs</p>
+                    <p class="text-2xl font-black text-slate-900">{{ stats.failed }}</p>
+                </div>
+            </div>
+        </div>
+
         <div class="grid grid-cols-1 gap-10 sm:grid-cols-2 xl:grid-cols-3">
             {% for project in projects %}
-            <div class="group bg-white overflow-hidden shadow-[0_8px_30px_rgb(0,0,0,0.04)] rounded-[2rem] border border-slate-100 hover:shadow-[0_20px_50px_rgba(79,70,229,0.1)] hover:scale-[1.02] transition-all duration-500">
+            <div class="group bg-white overflow-hidden shadow-[0_8px_30px_rgb(0,0,0,0.04)] rounded-[2rem] border border-slate-100 hover:border-indigo-200 hover:shadow-[0_20px_50px_rgba(79,70,229,0.1)] hover:scale-[1.02] transition-all duration-500">
                 <div class="p-8">
                     <div class="flex items-start justify-between">
                         <div class="flex items-center space-x-5">
@@ -23,14 +54,14 @@
                                 <i class="fas fa-cube text-white text-2xl"></i>
                             </div>
                             <div class="min-w-0">
-                                <h3 class="text-xl font-black text-slate-900 truncate group-hover:text-indigo-600 transition-colors tracking-tight">{{ project.name }}</h3>
+                                <h3 class="text-xl font-black text-slate-900 truncate transition-colors tracking-tight group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-indigo-600 group-hover:to-violet-600">{{ project.name }}</h3>
                                 <div class="flex items-center space-x-2 mt-1">
                                     <span class="text-xs font-bold text-slate-400 uppercase tracking-widest bg-slate-50 px-2 py-0.5 rounded-md border border-slate-100">{{ project.domain }}</span>
                                 </div>
                             </div>
                         </div>
                         <div class="flex flex-col items-end">
-                            {% with last_deployment=project.deployments.first %}
+                            {% with last_deployment=project.deployments.all.0 %}
                                 {% if last_deployment %}
                                     <div class="flex items-center space-x-2 bg-slate-50 px-3 py-1.5 rounded-full border border-slate-100 shadow-sm">
                                         <span class="relative flex h-2.5 w-2.5">
@@ -47,6 +78,8 @@
                                         {% if last_deployment.status == 'RUNNING' %}text-emerald-600
                                         {% elif last_deployment.status == 'FAILED' %}text-rose-600
                                         {% else %}text-amber-600{% endif %}">
+                                            {% if last_deployment.status == 'RUNNING' %}<i class="fas fa-play-circle mr-1"></i>{% endif %}
+                                            {% if last_deployment.status == 'FAILED' %}<i class="fas fa-exclamation-circle mr-1"></i>{% endif %}
                                             {{ last_deployment.status }}
                                         </span>
                                     </div>
@@ -68,7 +101,7 @@
                             <i class="far fa-clock mr-2 text-indigo-400"></i> Il y a {{ project.updated_at|timesince }}
                         </div>
                         <div class="flex space-x-3">
-                            {% with last_deployment=project.deployments.first %}
+                            {% with last_deployment=project.deployments.all.0 %}
                                 {% if last_deployment %}
                                     <a href="{% url 'deployment-logs' last_deployment.id %}" class="bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-tight transition-all duration-300">Logs</a>
                                 {% endif %}
