@@ -8,18 +8,34 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 
     <style type="text/tailwindcss">
+        :root {
+            --primary-gradient-from: #4f46e5;
+            --primary-gradient-to: #7c3aed;
+            --primary-ring: #6366f1;
+            --accent-gradient-from: #fb923c;
+            --accent-gradient-to: #f97316;
+        }
+
         @layer components {
             .btn-primary {
-                @apply inline-flex items-center px-5 py-2.5 border border-transparent text-sm font-semibold rounded-xl shadow-lg shadow-indigo-200 text-white bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all duration-300 hover:scale-[1.03] active:scale-95;
+                @apply inline-flex items-center px-5 py-2.5 border border-transparent text-sm font-semibold rounded-xl shadow-lg text-white transition-all duration-300 hover:scale-[1.03] active:scale-95 focus:outline-none focus:ring-2 focus:ring-offset-2;
+                background: linear-gradient(to right, var(--primary-gradient-from), var(--primary-gradient-to));
+                --tw-ring-color: var(--primary-ring);
+                box-shadow: 0 10px 15px -3px rgba(79, 70, 229, 0.2);
+            }
+            .btn-primary:hover {
+                filter: brightness(1.1);
             }
             .pro-badge {
-                @apply ml-1 px-1.5 py-0.5 text-[10px] font-bold tracking-wider text-white bg-gradient-to-r from-orange-400 to-orange-500 rounded-full shadow-sm uppercase;
+                @apply ml-1 px-1.5 py-0.5 text-[10px] font-bold tracking-wider text-white rounded-full shadow-sm uppercase;
+                background: linear-gradient(to right, var(--accent-gradient-from), var(--accent-gradient-to));
             }
             .nav-link {
                 @apply border-transparent text-slate-500 hover:text-indigo-600 hover:border-indigo-300 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium transition-all duration-300;
             }
             .nav-link-active {
-                @apply border-indigo-600 text-slate-900 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-semibold transition-all duration-300;
+                @apply text-slate-900 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-semibold transition-all duration-300;
+                border-color: var(--primary-gradient-from);
             }
             .glass-morphism {
                 @apply bg-white/70 backdrop-blur-md border-b border-white/20;
@@ -85,17 +101,17 @@
                     <!-- Mobile menu button -->
                     <div class="-mr-2 flex items-center sm:hidden">
                         <button type="button" class="bg-slate-50 inline-flex items-center justify-center p-2.5 rounded-xl text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all border border-slate-200" aria-controls="mobile-menu" aria-expanded="false" onclick="toggleMobileMenu()">
-                            <span class="sr-only">Open main menu</span>
-                            <i class="fas fa-bars text-xl" id="menu-icon"></i>
+                            <span class="sr-only">Menu principal</span>
+                            <i class="fas fa-bars text-xl transition-transform duration-300" id="menu-icon"></i>
                         </button>
                     </div>
                 </div>
             </div>
 
             <!-- Mobile menu -->
-            <div class="hidden sm:hidden bg-white/95 backdrop-blur-xl border-b border-slate-200 shadow-2xl rounded-b-3xl overflow-hidden transition-all duration-500 ease-in-out mx-2" id="mobile-menu">
+            <div class="hidden sm:hidden bg-white/95 backdrop-blur-xl border-b border-slate-200 shadow-2xl rounded-b-3xl overflow-hidden transition-all duration-500 ease-in-out mx-2 transform scale-95 opacity-0 origin-top" id="mobile-menu">
                 <div class="pt-4 pb-6 space-y-2 px-4">
-                    <a href="/" class="bg-indigo-600 text-white block px-4 py-4 text-base font-bold rounded-2xl shadow-lg shadow-indigo-100" aria-current="page">
+                    <a href="/" class="text-white block px-4 py-4 text-base font-bold rounded-2xl shadow-lg" style="background: linear-gradient(to right, var(--primary-gradient-from), var(--primary-gradient-to))" aria-current="page">
                         <i class="fas fa-home mr-3"></i> Tableau de bord
                     </a>
                     {% if is_pro_loaded %}
@@ -146,13 +162,28 @@
         function toggleMobileMenu() {
             const menu = document.getElementById('mobile-menu');
             const icon = document.getElementById('menu-icon');
-            menu.classList.toggle('hidden');
-            if (menu.classList.contains('hidden')) {
-                icon.classList.remove('fa-times');
-                icon.classList.add('fa-bars');
-            } else {
+            const isHidden = menu.classList.contains('hidden');
+
+            if (isHidden) {
+                menu.classList.remove('hidden');
+                // Trigger reflow for transition
+                menu.offsetHeight;
+                menu.classList.remove('scale-95', 'opacity-0');
+                menu.classList.add('scale-100', 'opacity-100');
                 icon.classList.remove('fa-bars');
-                icon.classList.add('fa-times');
+                icon.classList.add('fa-times', 'rotate-90');
+                document.querySelector('[aria-controls="mobile-menu"]').setAttribute('aria-expanded', 'true');
+            } else {
+                menu.classList.remove('scale-100', 'opacity-100');
+                menu.classList.add('scale-95', 'opacity-0');
+                icon.classList.remove('fa-times', 'rotate-90');
+                icon.classList.add('fa-bars');
+                document.querySelector('[aria-controls="mobile-menu"]').setAttribute('aria-expanded', 'false');
+                setTimeout(() => {
+                    if (menu.classList.contains('opacity-0')) {
+                        menu.classList.add('hidden');
+                    }
+                }, 500);
             }
         }
     </script>
