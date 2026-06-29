@@ -122,3 +122,41 @@ class TestLogSagePreprocessor(unittest.TestCase):
         # log 3 and log 2 should be more recent
         self.assertIn("INFO: log 3", processed)
         self.assertIn("INFO: log 2", processed)
+
+    def test_severity_score_default(self):
+        # Line with no recognized severity should return 10
+        self.assertEqual(self.preprocessor.get_severity_score("some random message"), 10)
+
+    def test_mpps_full_logic(self):
+        # Testing the full prioritization logic with max_output_lines
+        self.preprocessor = LogSagePreprocessor(max_output_lines=4, context_window=1)
+        logs = [
+            "INFO: start",           # 0
+            "DEBUG: noise",          # filtered out later, but let's assume it's here
+            "ERROR: anchor1",        # 1 (index after split and filter)
+            "INFO: context1",        # 2
+            "INFO: far",             # 3
+            "CRITICAL: anchor2",     # 4
+            "INFO: context2",        # 5
+            "INFO: end"              # 6
+        ]
+        # Joining with newline for process()
+        raw = "\n".join(logs)
+        processed = self.preprocessor.process(raw)
+
+        # Expected after filtering noise:
+        # INFO: start (0)
+        # ERROR: anchor1 (1)
+        # INFO: context1 (2)
+        # INFO: far (3)
+        # CRITICAL: anchor2 (4)
+        # INFO: context2 (5)
+        # INFO: end (6)
+
+        # Anchors: 1, 4 (score >= 80)
+        # Context window (1): 0, 1, 2 and 3, 4, 5
+        # Total selected so far: 0, 1, 2, 3, 4, 5. But max_output_lines=4
+
+        self.assertEqual(len(processed), 4)
+        self.assertIn("ERROR: anchor1", processed)
+        self.assertIn("CRITICAL: anchor2", processed)
