@@ -33,7 +33,10 @@ class RouterService:
         """
         Routes the request to LOCAL if resources are sufficient, otherwise CLOUD.
         """
-        if server.cpu_cores and server.cpu_cores >= cls.MIN_CPU_CORES and            server.memory_total and server.memory_total >= cls.MIN_MEMORY_BYTES:
+        cpu_ok = server.cpu_cores and server.cpu_cores >= cls.MIN_CPU_CORES
+        mem_ok = server.memory_total and server.memory_total >= cls.MIN_MEMORY_BYTES
+
+        if cpu_ok and mem_ok:
             return DiagnosticRequest.Routing.LOCAL
         return DiagnosticRequest.Routing.CLOUD
 
