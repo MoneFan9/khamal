@@ -93,9 +93,13 @@ class OllamaClient:
             "model": model,
             "keep_alive": 0
         }
-        response = requests.post(f"{self.api_url}/generate", json=payload)
-        response.raise_for_status()
-        return response.json()
+        try:
+            response = requests.post(f"{self.api_url}/generate", json=payload, timeout=5)
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.RequestException:
+            # If Ollama is unreachable or errors out, we've done our best
+            return None
 
     @contextmanager
     def session(self, model):

@@ -155,5 +155,6 @@ KHAMAL_ACME_STORAGE = env("KHAMAL_ACME_STORAGE", default="/letsencrypt/acme.json
 KHAMAL_ACME_CA_SERVER = env("KHAMAL_ACME_CA_SERVER", default="https://acme-v02.api.letsencrypt.org/directory")
 
 # Ollama Configuration
+# Optimized for 8GB RAM: lower keep-alive to free memory quickly
 OLLAMA_URL = env("OLLAMA_URL", default="http://localhost:11434")
-OLLAMA_KEEP_ALIVE = env("OLLAMA_KEEP_ALIVE", default="5m")
+OLLAMA_KEEP_ALIVE = env("OLLAMA_KEEP_ALIVE", default="1m")
