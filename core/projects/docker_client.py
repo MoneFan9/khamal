@@ -17,14 +17,16 @@ class HardenedContainerCollection:
         forbidden_params = {
             'privileged', 'cap_add', 'security_opt', 'userns_mode',
             'pid_mode', 'group_add', 'oom_kill_disable', 'devices',
-            'device_cgroup_rules'
+            'device_cgroup_rules', 'capadd', 'securityopt', 'usernsmode',
+            'pidmode', 'groupadd', 'oomkilldisable', 'devicecgrouprules'
         }
 
         def _recursive_check(d):
             if not isinstance(d, dict):
                 return
             for key, value in d.items():
-                if key in forbidden_params and value:
+                # Case-insensitive check to catch 'Privileged' or 'CapAdd' from host_config
+                if key.lower() in forbidden_params and value:
                     raise PermissionError(f"Security Policy Violation: Use of forbidden Docker parameter '{key}'")
                 if isinstance(value, dict):
                     _recursive_check(value)
