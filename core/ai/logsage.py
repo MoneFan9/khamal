@@ -55,12 +55,6 @@ class LogSagePreprocessor:
                 return score
         return 10  # Default to INFO score if not found
 
-    def deduplicate(self, logs: List[str]) -> List[str]:
-        """
-        Removes identical consecutive log lines to handle log bursts.
-        """
-        return [log for i, log in enumerate(logs) if i == 0 or log != logs[i-1]]
-
     def _add_anchors(self, scored_indices: List[tuple], selected_indices: set):
         """Phase 1: Add high-severity logs themselves first (anchors)."""
         for score, i in scored_indices:
