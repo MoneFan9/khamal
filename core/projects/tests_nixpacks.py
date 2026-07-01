@@ -26,6 +26,7 @@ class NixpacksServiceTest(IsolatedAsyncioTestCase):
         self.assertIn("test-image", args)
         self.assertIn("--env", args)
         self.assertIn("KEY=VALUE", args)
+        self.assertIn("NIXPACKS_NO_VENV=1", args)
 
     @patch('asyncio.create_subprocess_exec')
     async def test_build_image_failure(self, mock_exec):

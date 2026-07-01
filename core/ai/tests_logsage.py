@@ -122,3 +122,6 @@ class TestLogSagePreprocessor(unittest.TestCase):
         # log 3 and log 2 should be more recent
         self.assertIn("INFO: log 3", processed)
         self.assertIn("INFO: log 2", processed)
+
+    def test_get_severity_score_default(self):
+        self.assertEqual(self.preprocessor.get_severity_score("Some random log line"), 10)
