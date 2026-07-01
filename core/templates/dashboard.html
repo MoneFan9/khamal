@@ -30,7 +30,7 @@
                             </div>
                         </div>
                         <div class="flex flex-col items-end">
-                            {% with last_deployment=project.deployments.first %}
+                            {% with last_deployment=project.deployments.all.0 %}
                                 {% if last_deployment %}
                                     <div class="flex items-center space-x-2 bg-slate-50 px-3 py-1.5 rounded-full border border-slate-100 shadow-sm">
                                         <span class="relative flex h-2.5 w-2.5">
@@ -68,7 +68,7 @@
                             <i class="far fa-clock mr-2 text-indigo-400"></i> Il y a {{ project.updated_at|timesince }}
                         </div>
                         <div class="flex space-x-3">
-                            {% with last_deployment=project.deployments.first %}
+                            {% with last_deployment=project.deployments.all.0 %}
                                 {% if last_deployment %}
                                     <a href="{% url 'deployment-logs' last_deployment.id %}" class="bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-tight transition-all duration-300">Logs</a>
                                 {% endif %}
