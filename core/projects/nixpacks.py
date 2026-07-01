@@ -6,6 +6,10 @@ from typing import List, Optional, Dict, Any
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_NIXPACKS_ENVS = {
+    "NIXPACKS_NO_VENV": "1",  # Reduce image size by avoiding unnecessary venv inside the container
+}
+
 class NixpacksError(Exception):
     """Custom exception for Nixpacks-related errors."""
     pass
@@ -121,7 +125,12 @@ async def build_image(
     """
     Asynchronously invokes the Nixpacks CLI to build an image.
     """
-    env_args = [arg for k, v in (envs or {}).items() for arg in ("--env", f"{k}={v}")]
+    # Merge default optimization environment variables
+    merged_envs = DEFAULT_NIXPACKS_ENVS.copy()
+    if envs:
+        merged_envs.update(envs)
+
+    env_args = [arg for k, v in merged_envs.items() for arg in ("--env", f"{k}={v}")]
     name_args = ["--name", image_name] if image_name else []
     cmd = ["nixpacks", "build", path, "--cache", *name_args, *env_args, *(extra_args or [])]
 
