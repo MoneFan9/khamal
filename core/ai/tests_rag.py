@@ -12,7 +12,7 @@ class TestRCAPromptBuilder(unittest.TestCase):
         self.assertIsInstance(prompt_obj, RCAPrompt)
         self.assertIn("### Environment Context", prompt_obj.user)
         self.assertIn("ERROR: Connection refused", prompt_obj.user)
-        self.assertIn("**Project Name**: Unknown", prompt_obj.user)
+        self.assertIn("**Project**: Unknown", prompt_obj.user)
         self.assertEqual(prompt_obj.system, self.builder.SYSTEM_PROMPT)
 
     def test_to_ollama_messages(self):
@@ -36,9 +36,9 @@ class TestRCAPromptBuilder(unittest.TestCase):
         }
         prompt_obj = self.builder.build_prompt(logs, project_context=context)
 
-        self.assertIn("**Project Name**: MyCoolApp", prompt_obj.user)
-        self.assertIn("**Primary Language/Framework**: Django/Python", prompt_obj.user)
-        self.assertIn("**Deployment Environment**: Development", prompt_obj.user)
+        self.assertIn("**Project**: MyCoolApp", prompt_obj.user)
+        self.assertIn("**Runtime**: Django/Python", prompt_obj.user)
+        self.assertIn("**Env**: Development", prompt_obj.user)
         self.assertNotIn("ignored_key", prompt_obj.user)
 
     def test_empty_logs_raises_value_error(self):
@@ -70,5 +70,16 @@ class TestRCAPromptBuilder(unittest.TestCase):
         self.assertIn("RCAPromptBuilder", repr(self.builder))
         self.assertIn("max_log_chars=12000", repr(self.builder))
 
-    def test_get_system_prompt(self):
-        self.assertEqual(self.builder.get_system_prompt(), self.builder.SYSTEM_PROMPT)
+    def test_system_prompt_attribute(self):
+        self.assertEqual(self.builder.system_prompt, self.builder.SYSTEM_PROMPT)
+
+    def test_system_prompt_switching(self):
+        builder_no_tools = RCAPromptBuilder(enable_tools=False)
+        self.assertEqual(builder_no_tools.system_prompt, builder_no_tools.SYSTEM_PROMPT)
+
+        builder_with_tools = RCAPromptBuilder(enable_tools=True)
+        self.assertEqual(builder_with_tools.system_prompt, builder_with_tools.TOOL_ENABLED_SYSTEM_PROMPT)
+
+        custom_prompt = "You are a pirate."
+        builder_custom = RCAPromptBuilder(system_prompt=custom_prompt)
+        self.assertEqual(builder_custom.system_prompt, custom_prompt)
