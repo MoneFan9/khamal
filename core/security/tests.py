@@ -68,6 +68,49 @@ class USBGuardTests(TestCase):
         self.assertTrue(result)
         mock_run.assert_called_with(["sudo", "usbguard", "block-device", "1"], check=True)
 
+    @patch("subprocess.Popen")
+    def test_apply_policy_popen_failure(self, mock_popen):
+        mock_process = MagicMock()
+        mock_process.returncode = 1
+        mock_process.communicate.return_value = (None, None)
+        mock_popen.return_value = mock_process
+
+        result = USBGuardManager.apply_policy("allow all")
+        self.assertFalse(result)
+
+    @patch("subprocess.Popen")
+    @patch("subprocess.run")
+    def test_apply_policy_restart_failure(self, mock_run, mock_popen):
+        mock_process = MagicMock()
+        mock_process.returncode = 0
+        mock_process.communicate.return_value = (None, None)
+        mock_popen.return_value = mock_process
+
+        mock_run.side_effect = subprocess.CalledProcessError(1, "systemctl")
+
+        result = USBGuardManager.apply_policy("allow all")
+        self.assertFalse(result)
+
+    @patch("subprocess.run")
+    def test_generate_policy_failure(self, mock_run):
+        mock_run.side_effect = subprocess.CalledProcessError(1, "usbguard", stderr="Error")
+        self.assertIsNone(USBGuardManager.generate_policy())
+
+    @patch("subprocess.run")
+    def test_list_devices_failure(self, mock_run):
+        mock_run.side_effect = subprocess.CalledProcessError(1, "usbguard", stderr="Error")
+        self.assertIsNone(USBGuardManager.list_devices())
+
+    @patch("subprocess.run")
+    def test_allow_device_failure(self, mock_run):
+        mock_run.side_effect = subprocess.CalledProcessError(1, "usbguard")
+        self.assertFalse(USBGuardManager.allow_device(1))
+
+    @patch("subprocess.run")
+    def test_block_device_failure(self, mock_run):
+        mock_run.side_effect = subprocess.CalledProcessError(1, "usbguard")
+        self.assertFalse(USBGuardManager.block_device(1))
+
 class USBMountTests(TestCase):
 
     @patch("security.usb_mount.Path.is_block_device")
