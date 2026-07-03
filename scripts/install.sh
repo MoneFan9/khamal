@@ -15,11 +15,29 @@ NC='\033[0m' # No Color
 echo -e "${BLUE}🦁 Welcome to Khamal Installation${NC}"
 echo "----------------------------------"
 
+# 0. Check for Core directory (Auto-clone for curl | bash)
+if [ ! -d "core" ]; then
+    echo -e "${BLUE}📦 Khamal core not found. Cloning repository...${NC}"
+    if ! command -v git &> /dev/null; then
+        echo -e "${RED}❌ git is not installed. Please install git to continue.${NC}"
+        exit 1
+    fi
+    # If the directory is not empty and doesn't have 'core', we should probably fail or ask
+    if [ "$(ls -A)" ]; then
+         echo -e "${YELLOW}⚠️  Current directory is not empty. Cloning into 'khamal' folder instead...${NC}"
+         git clone https://github.com/khamal-paas/khamal.git khamal
+         cd khamal
+    else
+         git clone https://github.com/khamal-paas/khamal.git .
+    fi
+fi
+
 # 1. Prerequisite Checks
 echo -e "${BLUE}🔍 Checking prerequisites...${NC}"
 
 if ! command -v docker &> /dev/null; then
-    echo -e "${RED}❌ Docker is not installed. Please install Docker and try again.${NC}"
+    echo -e "${RED}❌ Docker is not installed.${NC}"
+    echo -e "${YELLOW}👉 Install Docker: sudo apt-get install docker.io (Linux) or visit https://docs.docker.com/get-docker/${NC}"
     exit 1
 fi
 
@@ -30,7 +48,8 @@ if ! docker info &> /dev/null; then
 fi
 
 if ! command -v python3 &> /dev/null; then
-    echo -e "${RED}❌ Python 3 is not installed. Please install Python 3 and try again.${NC}"
+    echo -e "${RED}❌ Python 3 is not installed.${NC}"
+    echo -e "${YELLOW}👉 Install Python 3: sudo apt-get install python3 (Linux) or brew install python (macOS)${NC}"
     exit 1
 fi
 
@@ -86,7 +105,7 @@ if update_env('SYSTEM_ADMIN_USERNAME', username):
 "
 
 # 4. Dependency Installation
-echo -e "${BLUE}📦 Installing dependencies...${NC}"
+echo -e "${BLUE}📦 Installing Python dependencies...${NC}"
 if [ ! -d "venv" ]; then
     python3 -m venv venv
 fi
@@ -95,7 +114,7 @@ pip install --upgrade pip
 pip install -r core/requirements.txt
 
 # 5. Database Migrations
-echo -e "${BLUE}🗄️  Running database migrations...${NC}"
+echo -e "${BLUE}🗄️  Applying database migrations...${NC}"
 export PYTHONPATH=core:.
 python3 core/manage.py migrate
 

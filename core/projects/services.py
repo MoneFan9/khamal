@@ -324,10 +324,19 @@ def create_deployment_container(deployment: Deployment, image: str):
     """
     Creates and starts a container for the deployment with proper networks and labels.
 
-    Architectural Note:
-    Each deployment is connected to two networks:
-    1. A private project network (for communication with project-specific DBs).
-    2. The global proxy network (for external access via Traefik).
+    ### 🏗️ Architectural Model: Dual-Network Isolation
+    Khamal enforces a strict security boundary by connecting each container to exactly two networks:
+    1. **Private Project Network (Bridge)**:
+       - Scope: Local to the project.
+       - Purpose: High-speed, private communication between the application and its dependencies (Postgres, Redis).
+       - Security: No external ingress is allowed on this network.
+    2. **Global Proxy Network (khamal-proxy)**:
+       - Scope: Shared across all projects.
+       - Purpose: Allows the global Traefik instance to route external HTTP/HTTPS traffic to the container.
+       - Security: Only the Traefik container and the application containers are members of this network.
+
+    This model ensures that even if one project is compromised, the attacker cannot scan or access
+    database containers of other projects, as they lack a common network layer.
     """
     client = get_docker_client()
     project = deployment.project

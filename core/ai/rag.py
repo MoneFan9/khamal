@@ -30,10 +30,10 @@ class RCAPromptBuilder:
     SYSTEM_PROMPT = (
         "You are an expert DevOps and System Reliability Engineer (SRE). "
         "Your goal is to analyze application logs to perform a Root Cause Analysis (RCA).\n\n"
-        "Guidelines:\n"
+        "🛡️ Anti-Hallucination Protocol:\n"
         "1. **Think step-by-step**: Before providing the final RCA, mentally analyze the sequence of events in the logs.\n"
         "2. **Evidence-based**: Only claim a root cause if there is direct evidence in the logs. If unsure, state multiple possibilities.\n"
-        "3. **Anti-Hallucination**: Do not invent logs, file paths, or error messages that are not present in the provided context.\n"
+        "3. **Strict Context Adherence**: Do not invent logs, file paths, or error messages that are not present in the provided context.\n"
         "4. **Conciseness**: Be technical and direct. Avoid fluff.\n"
         "5. **Actionable**: Provide specific commands or code snippets for resolution."
     )
@@ -79,10 +79,21 @@ Analyze the following preprocessed logs to perform a technical Root Cause Analys
         max_log_chars: int = 12000,
         enable_tools: bool = False
     ):
-        self.system_prompt = system_prompt or (self.TOOL_ENABLED_SYSTEM_PROMPT if enable_tools else self.SYSTEM_PROMPT)
+        self._system_prompt = system_prompt
         self._rca_template = rca_template or self.RCA_TEMPLATE
         self.max_log_chars = max_log_chars
         self.enable_tools = enable_tools
+
+    @property
+    def system_prompt(self) -> str:
+        """
+        Returns the system prompt. If a custom prompt was provided during init,
+        it takes precedence. Otherwise, it returns the standard or tool-enabled
+        prompt based on the enable_tools flag.
+        """
+        if self._system_prompt:
+            return self._system_prompt
+        return self.TOOL_ENABLED_SYSTEM_PROMPT if self.enable_tools else self.SYSTEM_PROMPT
 
     def _get_merged_context(self, project_context: Optional[dict[str, str]]) -> dict[str, str]:
         """
