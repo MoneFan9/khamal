@@ -55,11 +55,22 @@ class LogSagePreprocessor:
                 return score
         return 10  # Default to INFO score if not found
 
+    def _gen_deduplicate(self, iterable):
+        """
+        Private generator for unified, memory-efficient deduplication of
+        consecutive log lines.
+        """
+        prev = None
+        for item in iterable:
+            if item != prev:
+                yield item
+            prev = item
+
     def deduplicate(self, logs: List[str]) -> List[str]:
         """
         Removes identical consecutive log lines to handle log bursts.
         """
-        return [log for i, log in enumerate(logs) if i == 0 or log != logs[i-1]]
+        return list(self._gen_deduplicate(logs))
 
     def _add_anchors(self, scored_indices: List[tuple], selected_indices: set):
         """Phase 1: Add high-severity logs themselves first (anchors)."""
@@ -141,23 +152,11 @@ class LogSagePreprocessor:
         lines = (line.strip() for line in raw_logs.splitlines() if line.strip())
         filtered = (line for line in lines if not self.is_noise(line))
 
-        # Deduplicate using a generator-friendly approach
-        def gen_deduplicate(iterable):
-            prev = None
-            for item in iterable:
-                if item != prev:
-                    yield item
-                prev = item
+        # Deduplicate using the unified generator
+        deduplicated_gen = self._gen_deduplicate(filtered)
 
-        deduplicated_gen = gen_deduplicate(filtered)
-
-        # Convert to list only when necessary for prioritization or if small enough
-        # We need a list for _prioritize_logs because it uses indices and multiple passes
-        deduplicated = []
-        for i, log in enumerate(deduplicated_gen):
-            deduplicated.append(log)
-            # If we are already under the limit and only have a few more, we might still want to list it
-            # But the logic below will handle it.
+        # Convert to list only when necessary for prioritization
+        deduplicated = list(deduplicated_gen)
 
         if len(deduplicated) <= self.max_output_lines:
             return deduplicated
