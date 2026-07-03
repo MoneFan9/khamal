@@ -94,18 +94,24 @@ class LogSagePreprocessor:
         """
         Implementation of the Multi-Phase Prioritization Strategy (MPPS).
 
-        This algorithm ensures that local LLMs receive the most semantically dense
-        information within their context window limit (max_output_lines).
+        ### 🧠 The Problem: Context Window vs. Noise
+        Local LLMs have limited context windows and performance degrades with noise.
+        Raw logs are often 95% "heartbeats" or "info" and 5% critical signal.
+        MPPS extracts that 5% while maintaining the necessary context for RCA.
 
-        Strategy:
-        1. Anchors: First, we identify "Ground Zero" lines—those with high severity
-           scores (>= 80). These are the definitive error messages.
-        2. Proximity: We expand the selection around each anchor by 'context_window' lines.
-           This captures the stack trace leading to the error, which is often more
-           valuable for the AI than the error message itself.
-        3. Recency-Weighted Relevance: If space remains, we fill it with other logs.
-           We use a hybrid score: Severity + (Index / Total) * 10. This ensures that
-           late-occurring warnings take precedence over early-occurring ones.
+        ### 🏗️ Algorithm Phases:
+        1. **Phase 1: Anchors (Ground Zero)**:
+           Identifies lines with high severity scores (>= 80, e.g., CRITICAL, SIGSEGV).
+           These are the definitive failure points.
+        2. **Phase 2: Proximity (Stack Traces)**:
+           Expands around each anchor by `context_window` lines.
+           *Why?* The lines *preceding* an error (the stack trace) are usually more
+           informative for the AI than the error message itself.
+        3. **Phase 3: Recency-Weighted Relevance**:
+           Fills the remaining `max_output_lines` quota using a hybrid score:
+           `Severity + (Index / Total_Logs) * 10`.
+           *Why?* It prioritizes late-occurring warnings over early-occurring ones,
+           assuming the most recent logs are most relevant to the current crash.
         """
         total_logs = len(logs)
         if total_logs == 0:

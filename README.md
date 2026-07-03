@@ -9,12 +9,8 @@ Khamal est un orchestrateur intelligent de déploiement (Self-Hosted PaaS) conç
 Khamal est conçu pour être opérationnel immédiatement. Notre script d'installation automatise la configuration de l'environnement, la gestion des dépendances et la sécurisation du socket Docker.
 
 ```bash
-# Clonez le dépôt
-git clone https://github.com/your-repo/khamal.git
-cd khamal
-
-# Lancez l'installation automatique (Zero-Config)
-bash scripts/install.sh
+# Installation "One-Liner" (Zero-Config)
+curl -sSL https://raw.githubusercontent.com/khamal-paas/khamal/main/scripts/install.sh | bash
 ```
 
 ### Ce que fait l'installateur pour vous :
@@ -41,12 +37,19 @@ L'une des innovations majeures de Khamal est **LogSage**, un moteur de diagnosti
 
 ## 🏗️ Architecture Technique
 
-La pile technologique est choisie pour sa robustesse et sa facilité de contribution :
+Khamal repose sur une architecture modulaire et sécurisée, conçue pour la haute disponibilité et la simplicité de gestion.
 
-- **Backend** : Python 3.12+ / Django 6.0.
-- **Build Engine** : Nixpacks (détection automatique de langage, pas de Dockerfile requis).
-- **Proxy/Ingress** : Traefik v3 avec support SSL automatique.
-- **Sécurité** : Isolation par réseau Docker (`bridge` par projet) et USBGuard pour les imports physiques.
+### 🛣️ Routage & Ingress (Traefik)
+Khamal utilise un conteneur **Traefik v3** global comme point d'entrée unique. Il gère dynamiquement le routage vers les conteneurs applicatifs via des labels Docker et automatise l'obtention de certificats SSL via Let's Encrypt.
+
+### 🛡️ Isolation Réseau
+Chaque projet Khamal est déployé dans son propre **réseau bridge Docker isolé**. Les conteneurs d'un projet peuvent communiquer entre eux (ex: App <-> DB) mais sont isolés des autres projets. Seul le proxy Traefik a accès aux réseaux applicatifs pour le routage externe.
+
+### 🧠 LogSage : Diagnostic par IA
+Le moteur **LogSage** traite les flux de logs en trois phases (Anchors, Context, Quota) pour extraire la substance critique d'un crash. Ces informations sont ensuite injectées dans un modèle de langage local via **Ollama** pour générer une Analyse de Cause Racine (RCA) et des correctifs de code.
+
+### 📦 Build Engine (Nixpacks)
+Nous utilisons **Nixpacks** pour transformer le code source en images Docker optimisées sans nécessiter de Dockerfile. Il détecte automatiquement le langage, installe les dépendances et configure le processus de démarrage.
 
 ## 🤝 Contribuer & Développer
 
@@ -64,7 +67,7 @@ Nous encourageons la communauté à enrichir le cœur de Khamal.
 ### Règles d'Or
 - **Isolation du Core** : Le dossier `core/` ne doit **jamais** importer de modules provenant de `pro/`.
 - **Tests** : Toute nouvelle fonctionnalité dans le core doit être accompagnée de tests unitaires et d'intégration.
-- **Documentation** : Documentez le "Pourquoi" derrière vos choix techniques dans les docstrings.
+- **Technical Docstrings** : Nous exigeons une documentation rigoureuse. Chaque classe et fonction complexe doit avoir une docstring expliquant non seulement **comment** elle fonctionne, mais surtout **pourquoi** cette approche a été choisie (contexte architectural, contraintes de sécurité).
 
 ## 📄 Licence
 - `/core` est sous licence [Apache 2.0](./core/LICENSE).
