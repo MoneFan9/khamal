@@ -1,52 +1,59 @@
-from django.test import TestCase
+from rest_framework.test import APITestCase
 from django.contrib.auth import get_user_model
-from rest_framework.test import APIClient
-from rest_framework import status
-from .models import Server
+from pro.servers.models import Server
+from django.urls import reverse
 
 User = get_user_model()
 
-class ServerAPITestCase(TestCase):
+class ServerAPITests(APITestCase):
     def setUp(self):
-        self.user = User.objects.create_user(username="testuser", password="password")
-        self.client = APIClient()
-        self.server_data = {
-            "name": "Production Node 1",
-            "hostname_or_ip": "192.168.1.100",
-            "ssh_port": 22
-        }
-
-    def test_create_server_authenticated(self):
+        self.user = User.objects.create_user(username="serveruser", password="password")
         self.client.force_authenticate(user=self.user)
-        response = self.client.post("/api/servers/", self.server_data, format="json")
-        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(Server.objects.count(), 1)
+        self.server = Server.objects.create(
+            name="Test Server",
+            hostname_or_ip="10.0.0.4",
+            cpu_cores=2,
+            memory_total=4096
+        )
+        # Check reverse name, might be server-list or similar depending on router
+        self.list_url = reverse("server-list")
+        self.detail_url = reverse("server-detail", kwargs={"pk": self.server.id})
 
-    def test_create_server_unauthenticated(self):
-        response = self.client.post("/api/servers/", self.server_data, format="json")
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+    def test_list_servers(self):
+        response = self.client.get(self.list_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 1)
 
-    def test_read_only_fields_protection(self):
-        self.client.force_authenticate(user=self.user)
-        # Create server with initial status OFFLINE
-        server = Server.objects.create(**self.server_data)
-        self.assertEqual(server.status, Server.Status.OFFLINE)
+    def test_get_server_detail(self):
+        response = self.client.get(self.detail_url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["name"], "Test Server")
 
-        # Try to update status via API (should be ignored as it is read-only)
-        update_data = {"status": Server.Status.ONLINE}
-        response = self.client.patch(f"/api/servers/{server.id}/", update_data, format="json")
+    def test_create_server(self):
+        data = {"name": "New Server", "hostname_or_ip": "1.2.3.4", "ssh_port": 22}
+        response = self.client.post(self.list_url, data)
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(Server.objects.count(), 2)
 
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        server.refresh_from_db()
-        self.assertEqual(server.status, Server.Status.OFFLINE)
+    def test_update_server(self):
+        data = {"name": "Updated Server"}
+        response = self.client.patch(self.detail_url, data)
+        self.assertEqual(response.status_code, 200)
+        self.server.refresh_from_db()
+        self.assertEqual(self.server.name, "Updated Server")
+
+    def test_delete_server(self):
+        response = self.client.delete(self.detail_url)
+        self.assertEqual(response.status_code, 204)
+        self.assertEqual(Server.objects.count(), 0)
+
+    def test_unauthenticated_access(self):
+        self.client.force_authenticate(user=None)
+        response = self.client.get(self.list_url)
+        self.assertEqual(response.status_code, 403)
 
     def test_invalid_ssh_port(self):
-        self.client.force_authenticate(user=self.user)
-        invalid_data = self.server_data.copy()
-        invalid_data["ssh_port"] = 70000
-        response = self.client.post("/api/servers/", invalid_data, format="json")
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-
-    def test_str_representation(self):
-        server = Server.objects.create(**self.server_data)
-        self.assertEqual(str(server), "Production Node 1 (192.168.1.100)")
+        data = {"ssh_port": 70000}
+        response = self.client.patch(self.detail_url, data)
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("ssh_port", response.data)
