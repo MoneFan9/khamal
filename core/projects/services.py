@@ -86,36 +86,6 @@ def ensure_global_proxy():
             labels={"khamal.managed": "true"}
         )
 
-def _get_traefik_config() -> tuple[list[str], dict]:
-    """
-    Returns the command and volumes for the global Traefik container.
-    """
-    command = [
-        "--providers.docker=true",
-        "--providers.docker.exposedbydefault=false",
-        f"--providers.docker.network={PROXY_NETWORK_NAME}",
-        "--entrypoints.web.address=:80",
-        "--entrypoints.websecure.address=:443",
-    ]
-
-    volumes = {
-        '/var/run/docker.sock': {'bind': '/var/run/docker.sock', 'mode': 'ro'}
-    }
-
-    if settings.KHAMAL_SSL_ENABLED:
-        command.extend([
-            "--certificatesresolvers.le.acme.email=" + settings.KHAMAL_ACME_EMAIL,
-            "--certificatesresolvers.le.acme.storage=" + settings.KHAMAL_ACME_STORAGE,
-            "--certificatesresolvers.le.acme.tlschallenge=true",
-            "--certificatesresolvers.le.acme.caserver=" + settings.KHAMAL_ACME_CA_SERVER,
-            "--entrypoints.web.http.redirections.entryPoint.to=websecure",
-            "--entrypoints.web.http.redirections.entryPoint.scheme=https",
-        ])
-        # Persist certificates
-        volumes['khamal-letsencrypt'] = {'bind': '/letsencrypt', 'mode': 'rw'}
-
-    return command, volumes
-
 def ensure_project_network(project: Project) -> str:
     """
     Ensures an isolated bridge network exists for the project.
@@ -136,12 +106,12 @@ def ensure_project_network(project: Project) -> str:
     # Format: khamal-project-<id>-<name>
     network_name = f"khamal-project-{project.id}-{project.name.replace(' ', '-')}"
 
-    try:
-        # Check if network with this name already exists (e.g. from a previous crash)
-        networks = client.networks.list(names=[network_name])
-        if networks:
-            network = networks[0]
-        else:
+    # Check if network with this name already exists (e.g. from a previous crash)
+    networks = client.networks.list(names=[network_name])
+    if networks:
+        network = networks[0]
+    else:
+        try:
             network = client.networks.create(
                 network_name,
                 driver="bridge",
@@ -151,10 +121,26 @@ def ensure_project_network(project: Project) -> str:
                 },
                 check_duplicate=True
             )
+        except docker.errors.APIError as e:
+            if e.response is not None and e.response.status_code == 409:
+                # Race condition: retrieve the network that was just created
+                logger.info(f"Network {network_name} created by another process, retrieving.")
+                networks = client.networks.list(names=[network_name])
+                if networks:
+                    network = networks[0]
+                else:
+                    raise
+            else:
+                raise
+        except Exception as e:
+            logger.error(f"Failed to create network for project {project.name}: {e}")
+            raise
 
-        project.network_id = network.id
+    try:
+        network_id = str(network.id)
+        project.network_id = network_id
         project.save(update_fields=['network_id'])
-        return network.id
+        return network_id
     except Exception as e:
         logger.error(f"Failed to create network for project {project.name}: {e}")
         raise
