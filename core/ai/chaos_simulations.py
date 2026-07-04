@@ -76,3 +76,50 @@ SyntaxError: invalid syntax
             "fixed_block": "def list_items(request):",
             "rationale": "Missing colon after function definition in api/v1/endpoints.py."
         }
+
+    @staticmethod
+    def get_oom_error():
+        return {
+            "name": "Out of Memory (OOM)",
+            "logs": """
+INFO: Allocating memory for cache...
+DEBUG: Memory usage: 85%
+DEBUG: Memory usage: 92%
+ERROR: MemoryError: Unable to allocate 1.2GB for buffer
+CRITICAL: Process terminated by OOM-killer
+            """,
+            "project_context": {
+                "project_name": "Data-Processor",
+                "language": "Python/Pandas",
+                "environment": "Production"
+            },
+            "broken_file": "processor/config.py",
+            "broken_content": "BATCH_SIZE = 100000\nCHUNK_READ = False",
+            "fixed_content": "BATCH_SIZE = 1000\nCHUNK_READ = True",
+            "search_block": "BATCH_SIZE = 100000\nCHUNK_READ = False",
+            "fixed_block": "BATCH_SIZE = 1000\nCHUNK_READ = True",
+            "rationale": "The application is crashing due to memory exhaustion. Reducing batch size and enabling chunking to lower memory footprint."
+        }
+
+    @staticmethod
+    def get_permission_error():
+        return {
+            "name": "Permission Denied",
+            "logs": """
+INFO: Initializing storage...
+DEBUG: Attempting to write to /var/log/app.log
+ERROR: PermissionError: [Errno 13] Permission denied: '/var/log/app.log'
+FATAL: Cannot start application without log access.
+            """,
+            "project_context": {
+                "project_name": "Auth-Service",
+                "language": "NodeJS/Express",
+                "environment": "Staging"
+            },
+            "broken_file": "docker-compose.yml",
+            "broken_content": "services:\n  auth:\n    image: auth:latest\n    volumes:\n      - ./logs:/var/log",
+            "fixed_content": "services:\n  auth:\n    image: auth:latest\n    user: \"1000:1000\"\n    volumes:\n      - ./logs:/var/log",
+            "search_block": "image: auth:latest",
+            "fixed_block": "image: auth:latest\n    user: \"1000:1000\"",
+            "rationale": "The application lacks write permissions to the log directory. Explicitly setting the user UID/GID to ensure correct filesystem access."
+        }
