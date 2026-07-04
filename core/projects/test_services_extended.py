@@ -28,9 +28,10 @@ class TestProjectsServicesExtended:
         project = Project.objects.create(name="Test Project", owner=test_user, network_id="old-net")
 
         # client.networks.get fails, so it should recreate
-        client.networks.get.side_effect = Exception("Not found")
+        client.networks.get.side_effect = docker.errors.NotFound("Not found")
         client.networks.list.return_value = []
-        new_net = MagicMock(id="new-net")
+        new_net = MagicMock()
+        new_net.id = "new-net"
         client.networks.create.return_value = new_net
 
         net_id = ensure_project_network(project)
@@ -44,7 +45,13 @@ class TestProjectsServicesExtended:
         mock_get_client.return_value = client
         project = Project.objects.create(name="Test Project", owner=test_user)
 
-        existing_net = MagicMock(id="existing-net-id")
+        # First attempt to create fails with 409
+        response = MagicMock()
+        response.status_code = 409
+        client.networks.create.side_effect = docker.errors.APIError("Conflict", response=response)
+
+        existing_net = MagicMock()
+        existing_net.id = "existing-net-id"
         client.networks.list.return_value = [existing_net]
 
         net_id = ensure_project_network(project)
