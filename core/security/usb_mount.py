@@ -65,8 +65,13 @@ class USBMountManager:
         """
         # --- Security Hardening Protocol ---
         # 1. Path Normalization & Validation
-        is_valid, device_path, mount_point = USBMountManager._validate_paths(device_path, mount_point)
+        is_valid, device_path, normalized_mount = USBMountManager._validate_paths(device_path, mount_point)
         if not is_valid:
+            return False
+
+        # 2. Block Device Verification
+        if not Path(device_path).is_block_device():
+            logger.error(f"Path {device_path} is not a block device.")
             return False
 
         # 4. Integrate with USBGuard
@@ -91,9 +96,8 @@ class USBMountManager:
 
         authorized = False
         # Use regex with word boundaries to avoid partial matches (e.g., /dev/sdb matching /dev/sdb1)
-        # and ensure 'allow' is present in the line.
-        # We use a negative lookahead to ensure the path is not just a prefix (e.g. /dev/sdb vs /dev/sdb1)
-        path_pattern = re.compile(rf"\ballow\b.*({re.escape(device_path)}|{re.escape(parent_device)})(?![\w/])")
+        # and ensure 'allow' is present in the line with 'with-devpath'.
+        path_pattern = re.compile(rf"\ballow\b.*with-devpath \"?({re.escape(device_path)}|{re.escape(parent_device)})\"?\b")
 
         logger.debug(f"Checking USBGuard authorization for {device_path} (parent: {parent_device})")
         for line in devices.splitlines():
@@ -105,7 +109,7 @@ class USBMountManager:
              logger.error(f"Device {device_path} is not authorized by USBGuard.")
              return False
 
-        if not os.path.exists(mount_point):
+        if not os.path.exists(normalized_mount):
             try:
                 os.makedirs(normalized_mount, exist_ok=True)
             except OSError as e:
