@@ -1,10 +1,10 @@
-Django>=6.0.4
-django-environ>=0.13.0
+Django>=6.0.6
+django-environ>=0.14.0
 psycopg2-binary>=2.9.12
 djangorestframework>=3.17.1
-Pillow>=12.2.0
+Pillow>=12.3.0
 docker>=7.1.0
-GitPython>=3.1.49
-requests>=2.33.1
+GitPython>=3.1.50
+requests>=2.34.2
 channels>=4.3.2
-daphne>=4.2.1
+daphne>=4.2.2
