@@ -21,8 +21,7 @@ class TestServicesExtended:
 
         mock_client = MagicMock()
         mock_get_client.return_value = mock_client
-        mock_client.networks.get.side_effect = Exception("Not found")
-        mock_client.networks.list.return_value = []
+        mock_client.networks.get.side_effect = docker.errors.NotFound("Not found")
         mock_client.networks.create.return_value = MagicMock(id="new-id")
 
         network_id = ensure_project_network(project)
@@ -38,6 +37,10 @@ class TestServicesExtended:
         mock_client = MagicMock()
         mock_get_client.return_value = mock_client
         mock_network = MagicMock(id="existing-id")
+
+        # Simulate 409
+        response = MagicMock(status_code=409)
+        mock_client.networks.create.side_effect = docker.errors.APIError("Conflict", response=response)
         mock_client.networks.list.return_value = [mock_network]
 
         network_id = ensure_project_network(project)

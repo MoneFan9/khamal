@@ -194,6 +194,9 @@ class ProjectsServicesEdgeCasesTests(TestCase):
         mock_get_client.return_value = mock_client
         mock_net = MagicMock(id="existing-net")
         mock_net.id = "existing-net"
+        # Simulate 409
+        response = MagicMock(status_code=409)
+        mock_client.networks.create.side_effect = docker.errors.APIError("Conflict", response=response)
         mock_client.networks.list.return_value = [mock_net]
 
         net_id = ensure_project_network(self.project)

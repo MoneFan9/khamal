@@ -79,10 +79,24 @@ Analyze the following preprocessed logs to perform a technical Root Cause Analys
         max_log_chars: int = 12000,
         enable_tools: bool = False
     ):
-        self.system_prompt = system_prompt or (self.TOOL_ENABLED_SYSTEM_PROMPT if enable_tools else self.SYSTEM_PROMPT)
+        self._system_prompt = system_prompt
         self._rca_template = rca_template or self.RCA_TEMPLATE
         self.max_log_chars = max_log_chars
         self.enable_tools = enable_tools
+
+    @property
+    def system_prompt(self) -> str:
+        """
+        Returns the system prompt. If no custom prompt was provided during initialization,
+        returns the default prompt based on whether tools are enabled.
+        """
+        if self._system_prompt:
+            return self._system_prompt
+        return self.TOOL_ENABLED_SYSTEM_PROMPT if self.enable_tools else self.SYSTEM_PROMPT
+
+    @system_prompt.setter
+    def system_prompt(self, value: str):
+        self._system_prompt = value
 
     def _get_merged_context(self, project_context: Optional[dict[str, str]]) -> dict[str, str]:
         """
