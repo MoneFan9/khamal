@@ -28,8 +28,7 @@ class TestProjectsServicesExtended:
         project = Project.objects.create(name="Test Project", owner=test_user, network_id="old-net")
 
         # client.networks.get fails, so it should recreate
-        client.networks.get.side_effect = Exception("Not found")
-        client.networks.list.return_value = []
+        client.networks.get.side_effect = docker.errors.NotFound("Not found")
         new_net = MagicMock(id="new-net")
         client.networks.create.return_value = new_net
 
@@ -45,6 +44,10 @@ class TestProjectsServicesExtended:
         project = Project.objects.create(name="Test Project", owner=test_user)
 
         existing_net = MagicMock(id="existing-net-id")
+        # Simulate 409 Conflict when creating
+        response = MagicMock(status_code=409)
+        client.networks.create.side_effect = docker.errors.APIError("Conflict", response=response)
+        # First list (if any) or follow up list after 409
         client.networks.list.return_value = [existing_net]
 
         net_id = ensure_project_network(project)
@@ -57,7 +60,6 @@ class TestProjectsServicesExtended:
         client = MagicMock()
         mock_get_client.return_value = client
         project = Project.objects.create(name="Test Project", owner=test_user)
-        client.networks.list.return_value = []
         client.networks.create.side_effect = Exception("Docker error")
 
         with pytest.raises(Exception):

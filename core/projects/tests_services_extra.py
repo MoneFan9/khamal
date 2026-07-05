@@ -300,6 +300,9 @@ class TestServicesExtra:
 
         existing_network = MagicMock()
         type(existing_network).id = PropertyMock(return_value="existing-id")
+        # Simulate 409
+        response = MagicMock(status_code=409)
+        client.networks.create.side_effect = docker.errors.APIError("Conflict", response=response)
         client.networks.list.return_value = [existing_network]
 
         net_id = ensure_project_network(project)
@@ -322,10 +325,7 @@ class TestServicesExtra:
         project.save()
 
         # Mock network not found
-        client.networks.get.side_effect = Exception("Not found")
-
-        # Mock list to return empty
-        client.networks.list.return_value = []
+        client.networks.get.side_effect = docker.errors.NotFound("Not found")
 
         # Mock creation of new network
         new_network = MagicMock()

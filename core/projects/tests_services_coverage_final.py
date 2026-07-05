@@ -21,6 +21,9 @@ class TestServicesCoverageFinal:
 
         network = MagicMock()
         network.id = "existing-net-id"
+        # Simulate 409 Conflict
+        response = MagicMock(status_code=409)
+        client.networks.create.side_effect = docker.errors.APIError("Conflict", response=response)
         client.networks.list.return_value = [network]
 
         net_id = ensure_project_network(project)
