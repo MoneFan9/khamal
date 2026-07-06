@@ -84,6 +84,13 @@ Analyze the following preprocessed logs to perform a technical Root Cause Analys
         self.max_log_chars = max_log_chars
         self.enable_tools = enable_tools
 
+    def get_system_prompt(self) -> str:
+        """
+        Legacy method for backward compatibility with existing tests.
+        Returns the current system prompt.
+        """
+        return getattr(self, "system_prompt", self.SYSTEM_PROMPT)
+
     def _get_merged_context(self, project_context: Optional[dict[str, str]]) -> dict[str, str]:
         """
         Returns the merged project context with default values.
