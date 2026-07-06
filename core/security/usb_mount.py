@@ -52,24 +52,39 @@ class USBMountManager:
         return True, device_path, normalized_mount
 
     @staticmethod
-    def mount_volume(device_path, mount_point):
+    def is_block_device(device_path):
+        """
+        Checks if the given path is a block device.
+        """
+        try:
+            return Path(device_path).is_block_device()
+        except Exception:
+            return False
+
+    @staticmethod
+    def mount_volume(device_path, mount_point_raw):
         """
         Mounts a USB device to a specific mount point with security flags.
 
         Args:
             device_path (str): The path to the device (e.g., /dev/sdb1)
-            mount_point (str): The directory where the device should be mounted.
+            mount_point_raw (str): The directory where the device should be mounted.
 
         Returns:
             bool: True if successful, False otherwise.
         """
         # --- Security Hardening Protocol ---
         # 1. Path Normalization & Validation
-        is_valid, device_path, mount_point = USBMountManager._validate_paths(device_path, mount_point)
+        is_valid, device_path, normalized_mount = USBMountManager._validate_paths(device_path, mount_point_raw)
         if not is_valid:
             return False
 
-        # 4. Integrate with USBGuard
+        # 2. Block Device Verification
+        if not USBMountManager.is_block_device(device_path):
+            logger.error(f"Device {device_path} is not a valid block device.")
+            return False
+
+        # 3. Integrate with USBGuard
         if not USBGuardManager.is_installed():
             logger.error("USBGuard is not installed. Refusing to mount for security reasons.")
             return False
@@ -78,7 +93,7 @@ class USBMountManager:
             logger.error("USBGuard service is not active. Refusing to mount for security reasons.")
             return False
 
-        # 6. Verify device authorization in USBGuard
+        # 4. Verify device authorization in USBGuard
         # We ensure that the device (or its parent block device) is explicitly allowed by USBGuard.
         devices = USBGuardManager.list_devices()
         if devices is None:
@@ -105,13 +120,15 @@ class USBMountManager:
              logger.error(f"Device {device_path} is not authorized by USBGuard.")
              return False
 
-        if not os.path.exists(mount_point):
+        # 5. Create mount point if it does not exist
+        if not os.path.exists(normalized_mount):
             try:
                 os.makedirs(normalized_mount, exist_ok=True)
             except OSError as e:
                 logger.error(f"Failed to create mount point {normalized_mount}: {e}")
                 return False
 
+        # 6. Execute secure mount
         # -o noexec: Blocks execution of binaries (essential against malware).
         # -o nosuid: Prevents privilege escalation via setuid/setgid bits.
         # -o nodev: Disables device files interpretation.
