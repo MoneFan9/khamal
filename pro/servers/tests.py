@@ -50,3 +50,10 @@ class ServerAPITestCase(TestCase):
     def test_str_representation(self):
         server = Server.objects.create(**self.server_data)
         self.assertEqual(str(server), "Production Node 1 (192.168.1.100)")
+
+    def test_server_list_authenticated(self):
+        self.client.force_authenticate(user=self.user)
+        Server.objects.create(**self.server_data)
+        response = self.client.get("/api/servers/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)

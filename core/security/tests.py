@@ -1,7 +1,7 @@
 from django.test import TestCase
 from unittest.mock import patch, MagicMock
-from security.usb_guard import USBGuardManager
-from security.usb_mount import USBMountManager
+from core.security.usb_guard import USBGuardManager
+from core.security.usb_mount import USBMountManager
 import subprocess
 import os
 
@@ -70,10 +70,10 @@ class USBGuardTests(TestCase):
 
 class USBMountTests(TestCase):
 
-    @patch("security.usb_mount.Path.is_block_device")
-    @patch("security.usb_mount.USBGuardManager.list_devices")
-    @patch("security.usb_mount.USBGuardManager.is_service_active")
-    @patch("security.usb_mount.USBGuardManager.is_installed")
+    @patch("core.security.usb_mount.Path.is_block_device")
+    @patch("core.security.usb_mount.USBGuardManager.list_devices")
+    @patch("core.security.usb_mount.USBGuardManager.is_service_active")
+    @patch("core.security.usb_mount.USBGuardManager.is_installed")
     @patch("os.path.exists")
     @patch("os.makedirs")
     @patch("subprocess.run")
@@ -94,10 +94,10 @@ class USBMountTests(TestCase):
             check=True, capture_output=True, text=True
         )
 
-    @patch("security.usb_mount.Path.is_block_device")
-    @patch("security.usb_mount.USBGuardManager.list_devices")
-    @patch("security.usb_mount.USBGuardManager.is_service_active")
-    @patch("security.usb_mount.USBGuardManager.is_installed")
+    @patch("core.security.usb_mount.Path.is_block_device")
+    @patch("core.security.usb_mount.USBGuardManager.list_devices")
+    @patch("core.security.usb_mount.USBGuardManager.is_service_active")
+    @patch("core.security.usb_mount.USBGuardManager.is_installed")
     @patch("os.path.exists")
     @patch("subprocess.run")
     def test_mount_volume_failure(self, mock_run, mock_exists, mock_usbguard, mock_active, mock_list, mock_block):
@@ -145,12 +145,12 @@ class USBMountTests(TestCase):
         # Mounting directly on base
         self.assertFalse(USBMountManager.mount_volume("/dev/sdb1", "/mnt/usb"))
 
-    @patch("security.usb_mount.USBGuardManager.is_installed")
+    @patch("core.security.usb_mount.USBGuardManager.is_installed")
     def test_mount_volume_usbguard_not_installed(self, mock_installed):
         mock_installed.return_value = False
         self.assertFalse(USBMountManager.mount_volume("/dev/sdb1", "/mnt/usb/stick"))
 
-    @patch("security.usb_mount.USBGuardManager.is_installed")
+    @patch("core.security.usb_mount.USBGuardManager.is_installed")
     @patch("os.makedirs")
     @patch("os.path.exists")
     def test_mount_volume_makedirs_failure(self, mock_exists, mock_makedirs, mock_installed):
