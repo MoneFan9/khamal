@@ -20,11 +20,10 @@ class DeploymentListCreateAPIView(generics.ListCreateAPIView):
     """
     API view to list and create deployments.
     """
-    queryset = Deployment.objects.select_related('project').only(
-        'project__name', 'status', 'container_id', 'container_port', 'hot_reload', 'created_at', 'updated_at'
-    )
     serializer_class = DeploymentSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        return self.queryset.filter(project__owner=self.request.user).select_related('project')
+        return Deployment.objects.filter(project__owner=self.request.user).select_related('project').only(
+            'project__name', 'status', 'container_id', 'container_port', 'hot_reload', 'created_at', 'updated_at'
+        )
