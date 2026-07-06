@@ -1,4 +1,4 @@
-from django.test import TestCase
+from django.test import TestCase, override_settings
 import docker
 from unittest.mock import patch, MagicMock
 from .models import Project, Deployment
@@ -204,6 +204,23 @@ class ContainerServiceTest(TestCase):
         self.assertIsNone(self.deployment.container_id)
 
 class TraefikServiceTest(TestCase):
+
+    @override_settings(KHAMAL_SSL_ENABLED=True, KHAMAL_ACME_EMAIL="test@example.com", KHAMAL_ACME_STORAGE="/letsencrypt/acme.json", KHAMAL_ACME_CA_SERVER="https://acme-v02.api.letsencrypt.org/directory")
+    @patch('projects.services.get_docker_client')
+    def test_ensure_global_proxy_ssl_enabled(self, mock_get_client):
+        mock_client = MagicMock()
+        mock_get_client.return_value = mock_client
+        mock_client.networks.get.side_effect = docker.errors.NotFound("Network not found")
+        mock_client.containers.get.side_effect = docker.errors.NotFound("Container not found")
+
+        from projects.services import ensure_global_proxy
+        ensure_global_proxy()
+
+        mock_client.containers.run.assert_called_once()
+        args, kwargs = mock_client.containers.run.call_args
+        self.assertIn("--certificatesresolvers.le.acme.email=test@example.com", kwargs['command'])
+        self.assertIn("khamal-letsencrypt", kwargs['volumes'])
+
     @patch('projects.services.get_docker_client')
     def test_ensure_global_proxy_creates_everything(self, mock_get_client):
         mock_client = MagicMock()
