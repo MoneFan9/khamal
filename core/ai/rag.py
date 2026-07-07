@@ -127,7 +127,13 @@ Analyze the following preprocessed logs to perform a technical Root Cause Analys
             environment=context["environment"],
             logs=formatted_logs
         )
-        return RCAPrompt(system=self.system_prompt, user=user_content)
+        return RCAPrompt(system=self.get_system_prompt(), user=user_content)
+
+    def get_system_prompt(self) -> str:
+        """
+        Returns the configured system prompt.
+        """
+        return self.system_prompt
 
     def __repr__(self) -> str:
         return (
