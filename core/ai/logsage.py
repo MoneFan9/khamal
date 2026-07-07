@@ -1,5 +1,9 @@
 import re
+import io
+import logging
 from typing import List
+
+logger = logging.getLogger(__name__)
 
 class LogSagePreprocessor:
     """
@@ -132,13 +136,25 @@ class LogSagePreprocessor:
     def process(self, raw_logs: str) -> List[str]:
         """
         Main algorithm: filters noise, deduplicates, and prioritizes critical errors.
-        Uses generators for memory efficiency.
+        Uses io.StringIO and generators for memory efficiency.
+        Includes a safety cap of 2000 lines to prevent memory exhaustion.
         """
         if not raw_logs:
             return []
 
+        # Use io.StringIO for memory-efficient line iteration
+        log_stream = io.StringIO(raw_logs)
+
         # Use generator expressions to reduce memory overhead
-        lines = (line.strip() for line in raw_logs.splitlines() if line.strip())
+        # Safety cap: Stop after 2000 lines to prevent OOM on massive log files
+        def line_generator(stream):
+            for i, line in enumerate(stream):
+                if i >= 2000:
+                    logger.warning("LogSage: 2000-line safety cap reached during preprocessing. Truncating remaining logs.")
+                    break
+                yield line.strip()
+
+        lines = (line for line in line_generator(log_stream) if line)
         filtered = (line for line in lines if not self.is_noise(line))
 
         # Deduplicate using a generator-friendly approach
@@ -151,13 +167,8 @@ class LogSagePreprocessor:
 
         deduplicated_gen = gen_deduplicate(filtered)
 
-        # Convert to list only when necessary for prioritization or if small enough
-        # We need a list for _prioritize_logs because it uses indices and multiple passes
-        deduplicated = []
-        for i, log in enumerate(deduplicated_gen):
-            deduplicated.append(log)
-            # If we are already under the limit and only have a few more, we might still want to list it
-            # But the logic below will handle it.
+        # Convert to list for prioritization logic (multi-pass)
+        deduplicated = list(deduplicated_gen)
 
         if len(deduplicated) <= self.max_output_lines:
             return deduplicated
