@@ -31,23 +31,31 @@ class HardenedContainerCollection:
 
         _recursive_check(params)
 
-    def __getattribute__(self, name):
-        if name in ['_collection', 'run', 'create', '_check_security_params']:
-            return super().__getattribute__(name)
+    def __getattr__(self, name):
+        """
+        Proxy all other calls to the original collection.
+        """
         return getattr(self._collection, name)
 
 class HardenedDockerClient:
+    """
+    Proxy client that intercepts access to sensitive attributes.
+    """
     def __init__(self, client):
         self._client = client
         self.containers = HardenedContainerCollection(client.containers)
 
     def __getattribute__(self, name):
-        if name in ['api', '_client']:
-             raise PermissionError(f"Security Policy Violation: Direct access to low-level Docker API '{name}' is restricted.")
+        # Block direct access to the low-level API and the raw client
+        if name in ('api', '_client'):
+            raise PermissionError(f"Security Policy Violation: Direct access to low-level Docker API '{name}' is restricted.")
         return super().__getattribute__(name)
 
     def __getattr__(self, name):
-        return getattr(self._client, name)
+        # Proxy other calls to the underlying Docker client (e.g., networks, images)
+        # We use object.__getattribute__ to bypass the restriction on '_client'
+        client = object.__getattribute__(self, '_client')
+        return getattr(client, name)
 
 def get_docker_client():
     """
