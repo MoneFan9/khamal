@@ -1,17 +1,45 @@
 import docker
 from django.conf import settings
 
+class HardenedContainer:
+    def __init__(self, container):
+        self._container = container
+
+    def exec_run(self, *args, **kwargs):
+        forbidden_exec_params = {'privileged', 'user'}
+        for key in kwargs:
+            if key.lower() in forbidden_exec_params and kwargs[key]:
+                raise PermissionError(f"Security Policy Violation: Use of forbidden Docker exec parameter '{key}'")
+        return self._container.exec_run(*args, **kwargs)
+
+    def __getattribute__(self, name):
+        if name in ['_container', 'exec_run']:
+            return super().__getattribute__(name)
+        return getattr(self._container, name)
+
 class HardenedContainerCollection:
     def __init__(self, collection):
         self._collection = collection
 
     def run(self, *args, **kwargs):
         self._check_security_params(kwargs)
-        return self._collection.run(*args, **kwargs)
+        container = self._collection.run(*args, **kwargs)
+        if hasattr(container, 'exec_run'):
+            return HardenedContainer(container)
+        return container
 
     def create(self, *args, **kwargs):
         self._check_security_params(kwargs)
-        return self._collection.create(*args, **kwargs)
+        container = self._collection.create(*args, **kwargs)
+        return HardenedContainer(container)
+
+    def get(self, *args, **kwargs):
+        container = self._collection.get(*args, **kwargs)
+        return HardenedContainer(container)
+
+    def list(self, *args, **kwargs):
+        containers = self._collection.list(*args, **kwargs)
+        return [HardenedContainer(c) for c in containers]
 
     def _check_security_params(self, params):
         forbidden_params = {
@@ -24,7 +52,7 @@ class HardenedContainerCollection:
             if not isinstance(d, dict):
                 return
             for key, value in d.items():
-                if key in forbidden_params and value:
+                if key.lower() in forbidden_params and value:
                     raise PermissionError(f"Security Policy Violation: Use of forbidden Docker parameter '{key}'")
                 if isinstance(value, dict):
                     _recursive_check(value)
@@ -32,7 +60,7 @@ class HardenedContainerCollection:
         _recursive_check(params)
 
     def __getattribute__(self, name):
-        if name in ['_collection', 'run', 'create', '_check_security_params']:
+        if name in ['_collection', 'run', 'create', 'get', 'list', '_check_security_params']:
             return super().__getattribute__(name)
         return getattr(self._collection, name)
 

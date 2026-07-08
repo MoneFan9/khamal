@@ -69,6 +69,11 @@ class USBMountManager:
         if not is_valid:
             return False
 
+        # 2. Block Device Verification
+        if not Path(device_path).is_block_device():
+            logger.error(f"Device path {device_path} is not a valid block device.")
+            return False
+
         # 4. Integrate with USBGuard
         if not USBGuardManager.is_installed():
             logger.error("USBGuard is not installed. Refusing to mount for security reasons.")
@@ -85,15 +90,26 @@ class USBMountManager:
              logger.error("Failed to retrieve device list from USBGuard.")
              return False
 
-        # Attempt to find an 'allow' rule for the device path or its parent
-        # (e.g., if device_path is /dev/sdb1, we also check for /dev/sdb)
+        # Attempt to find an 'allow' rule for the device in USBGuard.
+        # USBGuard 'list-devices' typically shows ID, status, and device attributes.
+        # It doesn't always show the /dev path directly in a way that's easy to regex.
+        # However, we expect Khamal to have rules that might include the device path
+        # in the 'with-interface' or other attributes if manually configured,
+        # or we rely on the device being 'allow'ed in general.
+
+        # Refined logic: We check if the device is allowed by USBGuard.
+        # Since 'list-devices' output can vary, we look for 'allow' and the device path
+        # if it appears in the output, or we look for the specific USBGuard ID if we had it.
+        # For now, we'll keep the device_path check but make it more flexible.
+
         parent_device = device_path.rstrip('0123456789')
 
         authorized = False
-        # Use regex with word boundaries to avoid partial matches (e.g., /dev/sdb matching /dev/sdb1)
-        # and ensure 'allow' is present in the line.
-        # We use a negative lookahead to ensure the path is not just a prefix (e.g. /dev/sdb vs /dev/sdb1)
-        path_pattern = re.compile(rf"\ballow\b.*({re.escape(device_path)}|{re.escape(parent_device)})(?![\w/])")
+        # Improved regex: matches 'allow' and either the device path or parent device
+        # anywhere in the line, ensuring it's not just a substring of another path.
+        # We also check for quoted paths which are common in USBGuard output,
+        # and allow the path at the very end of the line.
+        path_pattern = re.compile(rf"\ballow\b.*([\s\"]{re.escape(device_path)}([\s\"]|$)|[\s\"]{re.escape(parent_device)}([\s\"]|$))")
 
         logger.debug(f"Checking USBGuard authorization for {device_path} (parent: {parent_device})")
         for line in devices.splitlines():
@@ -107,9 +123,9 @@ class USBMountManager:
 
         if not os.path.exists(mount_point):
             try:
-                os.makedirs(normalized_mount, exist_ok=True)
+                os.makedirs(mount_point, exist_ok=True)
             except OSError as e:
-                logger.error(f"Failed to create mount point {normalized_mount}: {e}")
+                logger.error(f"Failed to create mount point {mount_point}: {e}")
                 return False
 
         # -o noexec: Blocks execution of binaries (essential against malware).
@@ -118,12 +134,12 @@ class USBMountManager:
         mount_options = "noexec,nosuid,nodev"
 
         try:
-            command = ["sudo", "mount", "-o", mount_options, device_path, normalized_mount]
+            command = ["sudo", "mount", "-o", mount_options, device_path, mount_point]
             subprocess.run(command, check=True, capture_output=True, text=True)
-            logger.info(f"Successfully mounted {device_path} to {normalized_mount} with security options.")
+            logger.info(f"Successfully mounted {device_path} to {mount_point} with security options.")
             return True
         except subprocess.CalledProcessError as e:
-            logger.error(f"Failed to mount {device_path} to {normalized_mount}: {e.stderr}")
+            logger.error(f"Failed to mount {device_path} to {mount_point}: {e.stderr}")
             return False
 
     @staticmethod
